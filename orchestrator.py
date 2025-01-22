@@ -3,6 +3,7 @@ import openai
 from dotenv import load_dotenv
 import subprocess
 from git import Repo
+from modules.gui_module import launch_gui  # Import the GUI function
 
 # Load OpenAI API key
 load_dotenv()
@@ -65,7 +66,7 @@ def main():
 
     # Launch the GUI
     print("Launching the GUI...")
-    launch_gui(gmail_service=None)  # Pass Gmail service if needed
+    launch_gui()  # Call the GUI from gui_module.py
 
 if __name__ == "__main__":
     main()
