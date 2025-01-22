@@ -1,86 +1,82 @@
-Here is a basic skeleton of a Python module using Google Calendar API to create events. It uses the Google Auth library for OAuth 2.0.
+Creating a Python module to schedule events in Google Calendar using OAuth2 involves integrating the Google Calendar API. Here's a simple module named `google_calendar.py` to demonstrate how to authenticate and create an event:
 
-Please make sure that you have Google Calendar API enabled, and have valid `credentials.json` available which needs to be generated from the Google Cloud Platform.
+First, install the necessary Python libraries:
 
-Here is the code to install necessary Python packages:
-```bash
-pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
+```shell
+pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib 
 ```
-Here is the Python module `google_calendar.py`:
+
+Here is the `google_calendar.py`:
 
 ```python
 import datetime
-import os.path
-from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
 
-# If modifying these SCOPES, delete the file token.json.
-SCOPES = ['https://www.googleapis.com/auth/calendar']
+# Define the SCOPES. If modifying these scopes, delete the file token.pickle.
+SCOPES = ['https://www.googleapis.com/auth/calendar.events']
 
-def service_account_login():
+def auth_google_cal():
     creds = None
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json')
+    # The file token.pickle stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first time
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+    # If there are no (valid) credentials available, prompt the user to log in
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
+                'credentials.json', SCOPES) # 'credentials.json' obtained from Google Cloud Console.
             creds = flow.run_local_server(port=0)
         # Save the credentials for the next run
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
-    
-    try:
-        service = build('calendar', 'v3', credentials=creds)
-        return service
-    except Exception as e:
-        print(e)
-        return None
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
+    return creds
 
-def create_event(service, event_info):
-    try:
-        event = service.events().insert(calendarId='primary', body=event_info).execute()  
-        return "Event created : %s" % (event.get('htmlLink'))
-    except Exception as e:
-        return "An error occurred : %s" % (e)
+def create_event(start_time, end_time, summary, description=None, location=None):
+    creds = auth_google_cal()
 
-def prepare_event():
-    # Prepare the event's info
-    event_info = {
-      'summary': 'Google I/O 2021',
-      'location': '8 Parkway, Mountain View, CALIFORNIA, USA',
-      'description': 'Educational Program',
-      'start': {
-        'dateTime': '2021-11-09T09:00:00-07:00',
-        'timeZone': 'America/Los_Angeles',
-      },
-      'end': {
-        'dateTime': '2021-11-09T13:00:00-07:00',
-        'timeZone': 'America/Los_Angeles',
-      },
-      'reminders': {
-        'useDefault': False,
-        'overrides': [
-          {'method': 'email', 'minutes': 24 * 60},
-          {'method': 'popup', 'minutes': 10},
-        ],
-      },
+    service = build('calendar', 'v3', credentials=creds)
+
+    event = {
+        'summary': summary,
+        'location': location,
+        'description': description,
+        'start': {
+            'dateTime': start_time.strftime("%Y-%m-%dT%H:%M:%S"),
+            'timeZone': 'America/Los_Angeles',
+        },
+        'end': {
+            'dateTime': end_time.strftime("%Y-%m-%dT%H:%M:%S"),
+            'timeZone': 'America/Los_Angeles',
+        },
+        'reminders': {'useDefault': False},
     }
-    return event_info
 
-def main():
-    service = service_account_login()
-    if service is not None:
-        event_info = prepare_event()
-        print(create_event(service, event_info))
-        
-if __name__ == '__main__':
-    main()
+    event = service.events().insert(calendarId='primary', body=event).execute()
+    print('Event created: %s' % (event.get('htmlLink')))
+
 ```
-This script first attempts to log in to the Google Calendar API using OAuth2 credentials. After successfully logging in, the script prepares an event using the defined information, and then create an event using the Google Calendar service. If successful, it will print the event URL; otherwise, it will print the error message.
 
-Please replace 'summary', 'location', 'description', 'start', 'end', etc. in method `prepare_event()` as per your event's details. You can also modify SCOPES according to your application's access requirements.
+To use the module to create an event:
+
+```python
+import datetime
+import google_calendar
+
+start_time = datetime.datetime.now()
+end_time = start_time + datetime.timedelta(hours=1)
+
+summary = 'My Event'
+description = 'This is my sample event created for Google Calendar.'
+location = 'My Address, City, State'
+
+google_calendar.create_event(start_time, end_time, summary, description, location)
+```
+
+In the 'credentials.json', replace it with your own OAuth2 credentials (client_id and client_secret) which you can obtain from the Google Cloud Console (https://console.developers.google.com/).
+The first time you run this, it will prompt you to allow the app to access your Google Calendar. It will then store these credentials in a file named 'token.pickle'.
