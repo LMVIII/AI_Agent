@@ -57,35 +57,33 @@ def commit_and_push_changes(repo_path, commit_message, feedback_area):
         feedback_area.insert(tk.END, f"Error committing and pushing changes: {e}\n")
         feedback_area.see(tk.END)
 
-def launch_gui(gmail_service):
+def launch_gui():
+    """Launch the main GUI for AI Agent."""
     root = tk.Tk()
-    root.title("AI Agent - Scheduling Manager & AI Prompt Generator")
-    root.geometry("800x600")
+    root.title("AI Agent - Scheduling Manager & AI Assistant")
+    root.geometry("900x700")
 
-    # Existing scheduling inputs
-    tk.Label(root, text="Client Name:").pack(pady=5)
-    client_name_entry = tk.Entry(root, width=50)
-    client_name_entry.pack()
+    # Title for High-Level Prompt Section
+    tk.Label(root, text="What do you want me to do?", font=("Arial", 14, "bold")).pack(pady=10)
 
-    tk.Label(root, text="Client Email Address:").pack(pady=5)
-    client_email_entry = tk.Entry(root, width=50)
-    client_email_entry.pack()
-
-    # New AI Prompt Section
-    tk.Label(root, text="What do you want me to do?").pack(pady=5)
-    ai_prompt_entry = tk.Entry(root, width=70)
+    # AI Prompt Section
+    ai_prompt_frame = tk.Frame(root)
+    tk.Label(ai_prompt_frame, text="High-Level Task Description:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+    ai_prompt_entry = tk.Entry(ai_prompt_frame, width=60)
     ai_prompt_entry.insert(0, "Add logging to the Google Calendar scheduling function.")
-    ai_prompt_entry.pack(pady=5)
+    ai_prompt_entry.grid(row=0, column=1, padx=5, pady=5)
 
-    tk.Label(root, text="File to Update (default: modules/calendar_module.py):").pack(pady=5)
-    ai_file_entry = tk.Entry(root, width=50)
+    tk.Label(ai_prompt_frame, text="File to Update:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+    ai_file_entry = tk.Entry(ai_prompt_frame, width=60)
     ai_file_entry.insert(0, "modules/calendar_module.py")
-    ai_file_entry.pack(pady=5)
+    ai_file_entry.grid(row=1, column=1, padx=5, pady=5)
+    ai_prompt_frame.pack(pady=10)
 
-    # Feedback Area
-    feedback_area = scrolledtext.ScrolledText(root, width=90, height=15)
+    # Feedback Area for Logs
+    feedback_area = scrolledtext.ScrolledText(root, width=100, height=15)
     feedback_area.pack(pady=10)
 
+    # AI Task Execution Button
     def execute_ai_task():
         """Run the AI task in a separate thread."""
         def ai_task():
@@ -106,10 +104,27 @@ def launch_gui(gmail_service):
 
         threading.Thread(target=ai_task).start()
 
-    # Add button for AI Task
-    tk.Button(root, text="Build with AI", command=execute_ai_task).pack(pady=10)
+    tk.Button(root, text="Run AI Task", command=execute_ai_task, bg="green", fg="white", width=20).pack(pady=10)
 
-    # Existing scheduling functionality (trimmed for brevity)
-    tk.Button(root, text="Schedule Meeting", command=lambda: print("Schedule logic here")).pack(pady=10)
+    # Existing Scheduling Manager Section
+    tk.Label(root, text="Schedule a Meeting", font=("Arial", 14, "bold")).pack(pady=20)
+
+    tk.Label(root, text="Client Name:").pack(pady=5)
+    client_name_entry = tk.Entry(root, width=50)
+    client_name_entry.pack()
+
+    tk.Label(root, text="Client Email Address:").pack(pady=5)
+    client_email_entry = tk.Entry(root, width=50)
+    client_email_entry.pack()
+
+    tk.Label(root, text="Reason:").pack(pady=5)
+    reason_combo = ttk.Combobox(
+        root,
+        values=["Tax Organizer Review", "Financial Statement Review", "Tax Planning & Projections", "Other"],
+        width=40,
+    )
+    reason_combo.pack()
+
+    tk.Button(root, text="Schedule Meeting", command=lambda: print("Meeting scheduled!")).pack(pady=10)
 
     root.mainloop()
