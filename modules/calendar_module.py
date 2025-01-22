@@ -1,64 +1,77 @@
-Here is a simple Python module that uses the Google Calendar API with OAuth2 to schedule events.
+In order to interact with Google Calendar using Python, we'll use Google Calendar API. Here is a simple Python module that authenticates using OAuth2 and schedules an event.
 
-Please note that this module only includes the function to create an event and doesn't include the full OAuth2 procedure. It's assumed the user already has a valid OAuth2 token.
-
-Make sure you have google-auth, google-auth-transport-requests, google-auth-oauthlib, google-auth-httplib2, and google-api-python-client installed. You may install them via pip:
-
+Install these dependencies if not installed already:
+```shell
+pip install --upgrade google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
 ```
-pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib google-auth google-auth-transport-requests
-```
+
+Here is the Python code:
 
 ```python
+import os.path
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
-from google.oauth2.credentials import Credentials
+from datetime import datetime, timedelta
 
-class GoogleCalendar:
+SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-    def __init__(self, token):
-        """ Initialize the Google Calendar API client """
-        self.creds = Credentials.from_authorized_user_file(token)
-        self.service = build('calendar', 'v3', credentials=self.creds)
+def service_account_login():
+    creds = None
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
 
-    def create_event(self, summary, location, description, start_time, end_time, attendees=[], reminder_minutes=10):
-        """
-        Create an event on Google Calendar.
-        """
-        event = {
-            'summary': summary,
-            'location': location,
-            'description': description,
-            'start': {
-                'dateTime': start_time,
-                'timeZone': 'America/Los_Angeles',
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                'credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
+
+    return build('calendar', 'v3', credentials=creds)
+
+def create_event(service, start_time_str, end_time_str, summary, description, location):
+    start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
+    end_time = datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
+
+    event_result = service.events().insert(calendarId='primary',
+        body={
+            "summary": summary,
+            "description": description,
+            "location": location,
+            "start": {
+                "dateTime": start_time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "timeZone": 'America/Los_Angeles',
             },
-            'end': {
-                'dateTime': end_time,
-                'timeZone': 'America/Los_Angeles',
+            "end": {
+                "dateTime": end_time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "timeZone": 'America/Los_Angeles',
             },
-            'attendees': [
-                {'email': attendee} for attendee in attendees
-            ],
-            'reminders': {
-                'useDefault': False,
-                'overrides': [
-                    {'method': 'email', 'minutes': 24 * 60},
-                    {'method': 'popup', 'minutes': reminder_minutes},
+            "reminders": {
+                "useDefault": False,
+                "overrides": [
+                    {"method": "email", "minutes": 24 * 60},
+                    {"method": "popup", "minutes": 10},
                 ],
             },
         }
+    ).execute()
 
-        event = self.service.events().insert(calendarId='primary', body=event).execute()
-        print(f'Event created: {event.get("htmlLink")}')
-        return event
+    print(f"Created event {event_result['summary']}")
 
+if __name__ == "__main__":
+    service = service_account_login()
+    start_time_str = "2022-01-01 09:00:00"
+    end_time_str = "2022-01-01 10:00:00"
+    summary = "Sample Event"
+    description = "This is a sample description"
+    location = "Los Angeles, CA"
+    create_event(service, start_time_str, end_time_str, summary, description, location)
 ```
+Please replace 'credentials.json' with your own OAuth 2.0 Client ID JSON file which you can download from Google Cloud Platform Console and adjust the time and details of the event in the `if __name__ == "__main__"` block to fit your needs. 
 
-In this class, `create_event` function takes in a summary of the event, a description, a start time, an end time, and a list of attendees (as email addresses). You can call this function to create an event, and it will return the created event information.
-
-Make sure that you've turned on Calendar API for your project under Google console and have the appropriate credentials.
-
-Make sure to replace `'America/Los_Angeles'` with the appropriate time zone for your use case.
-
-Be sure your datetime is in RFC3339 format. For example: `2022-03-25T15:30:00.00Z`.
-
-Please handle the exception for the request as per your application logic. Here I've just kept it at a very high level.
+Keep in mind that Google’s OAuth 2.0 process requires consent screen configuration for your application where you define your application’s name, support contact, the scope of access, a domain name, and a redirect URI.

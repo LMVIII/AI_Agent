@@ -63,5 +63,9 @@ def main():
         commit_message="AI-generated update for calendar_module.py"
     )
 
+    # Launch the GUI
+    print("Launching the GUI...")
+    launch_gui(gmail_service=None)  # Pass Gmail service if needed
+
 if __name__ == "__main__":
     main()
