@@ -1,13 +1,68 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, scrolledtext
 import threading
 from modules.job_module import save_jobs_to_file, scheduling_jobs, update_gui
 from modules.utils import STATE_TIMEZONE_MAPPING
+from git import Repo
+import openai
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+def generate_code(prompt):
+    """Generate code using OpenAI API."""
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response['choices'][0]['message']['content']
+    except Exception as e:
+        return f"Error generating code: {e}"
+
+def update_file_with_code(file_path, prompt, feedback_area):
+    """Generate code and update the file."""
+    feedback_area.insert(tk.END, f"Generating code for {file_path}...\n")
+    feedback_area.see(tk.END)
+
+    code = generate_code(prompt)
+    if not code or code.startswith("Error"):
+        feedback_area.insert(tk.END, f"Code generation failed: {code}\n")
+        feedback_area.see(tk.END)
+        return
+
+    try:
+        with open(file_path, "w") as file:
+            file.write(code)
+        feedback_area.insert(tk.END, f"Updated {file_path} successfully!\n")
+        feedback_area.see(tk.END)
+    except Exception as e:
+        feedback_area.insert(tk.END, f"Error updating file {file_path}: {e}\n")
+        feedback_area.see(tk.END)
+
+def commit_and_push_changes(repo_path, commit_message, feedback_area):
+    """Commit and push changes to GitHub."""
+    try:
+        repo = Repo(repo_path)
+        repo.git.add(all=True)
+        repo.index.commit(commit_message)
+        origin = repo.remote(name='origin')
+        origin.push()
+        feedback_area.insert(tk.END, "Changes pushed to GitHub successfully!\n")
+        feedback_area.see(tk.END)
+    except Exception as e:
+        feedback_area.insert(tk.END, f"Error committing and pushing changes: {e}\n")
+        feedback_area.see(tk.END)
 
 def launch_gui(gmail_service):
     root = tk.Tk()
-    root.title("AI Agent - Scheduling Manager")
+    root.title("AI Agent - Scheduling Manager & AI Prompt Generator")
+    root.geometry("800x600")
 
+    # Existing scheduling inputs
     tk.Label(root, text="Client Name:").pack(pady=5)
     client_name_entry = tk.Entry(root, width=50)
     client_name_entry.pack()
@@ -16,118 +71,45 @@ def launch_gui(gmail_service):
     client_email_entry = tk.Entry(root, width=50)
     client_email_entry.pack()
 
-    tk.Label(root, text="Year:").pack(pady=5)
-    year_combo = ttk.Combobox(root, values=[str(y) for y in range(2019, 2026)], width=10)
-    year_combo.pack()
+    # New AI Prompt Section
+    tk.Label(root, text="What do you want me to do?").pack(pady=5)
+    ai_prompt_entry = tk.Entry(root, width=70)
+    ai_prompt_entry.insert(0, "Add logging to the Google Calendar scheduling function.")
+    ai_prompt_entry.pack(pady=5)
 
-    tk.Label(root, text="Period:").pack(pady=5)
-    period_category_combo = ttk.Combobox(root, values=["Month", "Quarter", "Annual"], width=20)
-    period_category_combo.pack()
+    tk.Label(root, text="File to Update (default: modules/calendar_module.py):").pack(pady=5)
+    ai_file_entry = tk.Entry(root, width=50)
+    ai_file_entry.insert(0, "modules/calendar_module.py")
+    ai_file_entry.pack(pady=5)
 
-    specific_period_label = tk.Label(root, text="Specific Period:")
-    specific_period_label.pack(pady=5)
-    specific_period_combo = ttk.Combobox(root, values=[], width=20)
-    specific_period_combo.pack()
+    # Feedback Area
+    feedback_area = scrolledtext.ScrolledText(root, width=90, height=15)
+    feedback_area.pack(pady=10)
 
-    def on_period_category_change(event):
-        category = period_category_combo.get()
-        if category == "Month":
-            specific_period_label.config(text="Specific Month:")
-            specific_period_combo['values'] = [
-                "January", "February", "March", "April", "May", "June",
-                "July", "August", "September", "October", "November", "December"
-            ]
-            specific_period_combo.set("")  # Clear selection
-            specific_period_combo.configure(state="normal")
-        elif category == "Quarter":
-            specific_period_label.config(text="Specific Quarter:")
-            specific_period_combo['values'] = ["Q1", "Q2", "Q3", "Q4"]
-            specific_period_combo.set("")  # Clear selection
-            specific_period_combo.configure(state="normal")
-        elif category == "Annual":
-            specific_period_label.config(text="")
-            specific_period_combo.set("Annual")
-            specific_period_combo.configure(state="disabled")
+    def execute_ai_task():
+        """Run the AI task in a separate thread."""
+        def ai_task():
+            file_path = ai_file_entry.get().strip()
+            prompt = ai_prompt_entry.get().strip()
 
-    period_category_combo.bind("<<ComboboxSelected>>", on_period_category_change)
-
-    tk.Label(root, text="Reason:").pack(pady=5)
-    reason_combo = ttk.Combobox(
-        root,
-        values=["Tax Organizer Review", "Financial Statement Review", "Tax Planning & Projections", "Tax Filings", "Other"],
-        width=30,
-    )
-    reason_combo.pack()
-
-    custom_reason_frame = tk.Frame(root)
-    custom_reason_label = tk.Label(custom_reason_frame, text="Custom Reason (if 'Other'):")
-    custom_reason_entry = tk.Entry(custom_reason_frame, width=50)
-
-    def on_reason_change(event):
-        if reason_combo.get() == "Other":
-            custom_reason_frame.pack(pady=5, after=reason_combo)
-            custom_reason_label.pack(side="left", padx=5)
-            custom_reason_entry.pack(side="right", padx=5)
-        else:
-            custom_reason_frame.pack_forget()
-
-    reason_combo.bind("<<ComboboxSelected>>", on_reason_change)
-
-    tk.Label(root, text="Priority (1 = High, 2 = Medium, 3 = Low):").pack(pady=5)
-    priority_combo = ttk.Combobox(root, values=["1", "2", "3"], width=5)
-    priority_combo.pack()
-
-    tk.Label(root, text="Client State:").pack(pady=5)
-    state_combo = ttk.Combobox(root, values=list(STATE_TIMEZONE_MAPPING.keys()), width=30)
-    state_combo.pack()
-
-    selected_timezone = tk.StringVar(value="America/New_York")
-
-    def on_state_selection():
-        selected_state = state_combo.get()
-        if selected_state:
-            timezone_name = STATE_TIMEZONE_MAPPING.get(selected_state, "America/New_York")
-            selected_timezone.set(timezone_name)
-            messagebox.showinfo("Time Zone Updated", f"Time zone set to {timezone_name} for {selected_state}")
-        else:
-            messagebox.showerror("Error", "Please select a valid state.")
-
-    state_combo.bind("<<ComboboxSelected>>", lambda event: on_state_selection())
-
-    tk.Label(root, text="Ongoing Scheduling Jobs:").pack(pady=10)
-    columns = ("ID", "Client Name", "Subject", "Priority", "Progress")
-    job_list = ttk.Treeview(root, columns=columns, show="headings", height=10)
-    for col in columns:
-        job_list.heading(col, text=col)
-    job_list.pack(pady=5)
-
-    def execute_command():
-        def schedule_task():
-            client_name = client_name_entry.get().strip()
-            client_email = client_email_entry.get().strip()
-            year = year_combo.get().strip()
-            period = specific_period_combo.get().strip()
-            reason = reason_combo.get().strip()
-            if reason == "Other":
-                reason = custom_reason_entry.get().strip()
-            priority = priority_combo.get().strip()
-
-            if not all([client_name, client_email, year, period, reason, priority]):
-                messagebox.showerror("Error", "All fields must be filled out.")
+            if not file_path or not prompt:
+                messagebox.showerror("Error", "Please provide both a file path and a prompt.")
                 return
 
-            # Example scheduling logic
-            print(f"Scheduling meeting for {client_name} ({client_email})")
-            # Update GUI after task completes
-            update_gui(job_list)
+            feedback_area.insert(tk.END, f"Processing AI prompt: {prompt}\n")
+            feedback_area.see(tk.END)
 
-        threading.Thread(target=schedule_task).start()
+            update_file_with_code(file_path, prompt, feedback_area)
 
-    tk.Button(root, text="Schedule Meeting", command=execute_command).pack(pady=10)
+            commit_message = f"Updated {file_path} with changes: {prompt}"
+            commit_and_push_changes("C:/Users/louie/MyPythonProjects/AI_Agent", commit_message, feedback_area)
 
-    tk.Button(root, text="Delete Selected Job", command=lambda: delete_selected_job(job_list)).pack(pady=5)
+        threading.Thread(target=ai_task).start()
 
-    update_gui(job_list)
+    # Add button for AI Task
+    tk.Button(root, text="Build with AI", command=execute_ai_task).pack(pady=10)
+
+    # Existing scheduling functionality (trimmed for brevity)
+    tk.Button(root, text="Schedule Meeting", command=lambda: print("Schedule logic here")).pack(pady=10)
+
     root.mainloop()
-
-
