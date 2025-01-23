@@ -42,20 +42,36 @@ def generate_code(prompt):
         return f"Error generating code: {e}"
 
 def update_file_with_code(prompt, feedback_area):
-    """Generate code and update the file based on AI response."""
+    """Generate code, validate response, and update the file based on AI response."""
     feedback_area.insert(tk.END, "Connecting to OpenAI API...\n")
     feedback_area.see(tk.END)
 
     try:
         # Generate code and determine file from OpenAI
         response = generate_code(prompt)
+        
+        # Validate response format
+        if "\n\n" not in response:
+            feedback_area.insert(tk.END, f"Error: OpenAI response does not include a valid file name and code.\n")
+            feedback_area.insert(tk.END, f"Response: {response}\n")
+            feedback_area.see(tk.END)
+            return
+        
         file_name, code = response.split("\n\n", 1)
 
-        feedback_area.insert(tk.END, f"Updating file: {file_name.strip()}...\n")
+        # Validate file name
+        if not file_name.strip().endswith(".py"):
+            feedback_area.insert(tk.END, f"Error: OpenAI did not return a valid Python file name.\n")
+            feedback_area.insert(tk.END, f"Response: {response}\n")
+            feedback_area.see(tk.END)
+            return
+
+        file_name = file_name.strip()
+        feedback_area.insert(tk.END, f"Updating file: {file_name}...\n")
         feedback_area.see(tk.END)
 
         # Write code to the file
-        with open(file_name.strip(), "w") as file:
+        with open(file_name, "w") as file:
             file.write(code)
         feedback_area.insert(tk.END, "File updated successfully!\n")
         feedback_area.see(tk.END)

@@ -1,58 +1,46 @@
-I won't be able to provide a full, tested solution as it would require an actual Google account and API credits to perform a complete test. However, I can give you a breakdown on how this can be achieved.
-
-Firstly, you will need to install the Google Client Library using pip like:
-
-```
-pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
-```
-
-You'll need to follow the Python Quickstart guide (https://developers.google.com/calendar/quickstart/python) to setup the `credentials.json` file.
-
-Once you've done this setup, here's the general content of your module:
+Sure, here's an example of how you might set this up in Python:
 
 ```python
-# importing necessary libraries
-from __future__ import print_function
+# file: gcal_scheduler.py
 import datetime
-from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
 
-# the scope for google calendar API
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-def create_event(summary, location, description, start_event, end_event, attendees):
-    """
-    Create an event in google calendar
-    """
-
-    credentials = None
-
-    if not credentials or not credentials.valid:
-        if credentials and credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
+def get_credentials():
+    creds = None
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json')
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
                 'credentials.json', SCOPES)
-            credentials = flow.run_local_server(port=0)
+            creds = flow.run_local_server(port=0)
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
+    return creds
 
-    service = build('calendar', 'v3', credentials=credentials)
-
+def create_event(summary, location, description, start_time, end_time):
+    creds = get_credentials()
+    service = build('calendar', 'v3', credentials=creds)
+    
     event = {
         'summary': summary,
         'location': location,
         'description': description,
         'start': {
-            'dateTime': start_event,
+            'dateTime': start_time,
             'timeZone': 'America/Los_Angeles',
         },
         'end': {
-            'dateTime': end_event,
+            'dateTime': end_time,
             'timeZone': 'America/Los_Angeles',
         },
-        'attendees': [
-            {'email': attendee},
-        ],
         'reminders': {
             'useDefault': False,
             'overrides': [
@@ -63,27 +51,17 @@ def create_event(summary, location, description, start_event, end_event, attende
     }
 
     event = service.events().insert(calendarId='primary', body=event).execute()
-    print("Event created: %s" % (event.get('htmlLink')))
-
+    print(f'Event created: {event.get("htmlLink")}')
 ```
 
-You will need to provide the necessary details like event summary, location, description, start and end times, and the list of attendees (as a list of email addresses) to call your create_event method and create an event.
+This very basic module gets an OAuth2 token, then uses it to authenticate with the Google Calendar API and create an event. A few important notes:
 
-Remember you'll need to provide the startDate and endDate in the right format: 
+- You need to replace the 'credentials.json' with your own file, which should be obtained from your Google Cloud Console (https://console.cloud.google.com/).
 
-```
-dateTime": "2021-05-28T09:00:00-07:00"
-```
+- This event is created on the primary calendar of the user who authorizes the app. If you want to add events to a different calendar, you can replace 'primary' with the calendar ID.
 
-The line 
-```python
-flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-```
-..expects the credentials.json to be in the same directory as your python script. Please ensure to provide the correct path to your credential file.
-Also note, event times need to be in RFC3339 format.
+- This example specifies reminders 24 hours before the event by email, and 10 minutes before the event by popup. 
 
-Apart from this module, remember to follow the complete OAuth2 flow when using the Google API with Python. Provide the expected scopes to ensure your application has the necessary permissions and properly handle token expiry and refreshing.
+- You can add more functionalities based on your requirements, this is very basic script which covers getting OAuth2 token and adding events to the calendar. 
 
-Remember to secure your credentials.json as it contains sensitive information. Secure transmission and storage of this information should be a top priority.
-
-There are other important aspects not covered here like error handling and managing calendar permissions, but this gives a basic overview of the process.
+- You should handle exceptions and errors, this script does not cover those.
