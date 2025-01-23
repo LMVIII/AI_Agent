@@ -1,10 +1,11 @@
+import os
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 import pytz
-import os
 
+# Scopes required by Gmail API (add more if needed)
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.send',
     'https://www.googleapis.com/auth/gmail.settings.basic'
@@ -49,18 +50,38 @@ def initialize_services():
         dict: A dictionary of initialized services.
     """
     services = {}
+
     try:
-        # Example: Initialize Gmail API service
-        from googleapiclient.discovery import build
-        creds = ...  # Load credentials
+        # Load OpenAI API Key
+        services['openai_key'] = os.getenv("OPENAI_API_KEY")
+        if not services['openai_key']:
+            raise ValueError("OpenAI API key is missing in environment variables.")
+
+        # Initialize Gmail API (OAuth2)
+        creds = None
+        # The token.json file stores the user's access and refresh tokens, and is created automatically when the
+        # authorization flow completes for the first time.
+        if os.path.exists('token.json'):
+            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        # If there are no (valid) credentials available, let the user log in.
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    'credentials.json', SCOPES)
+                creds = flow.run_local_server(port=0)
+            # Save the credentials for the next run
+            with open('token.json', 'w') as token:
+                token.write(creds.to_json())
+        
+        # Build the Gmail service
         services['gmail'] = build('gmail', 'v1', credentials=creds)
 
-        # Example: Load OpenAI API key
-        import os
-        services['openai_key'] = os.getenv("OPENAI_API_KEY")
-
         print("Services initialized successfully.")
+
     except Exception as e:
         print(f"Error initializing services: {e}")
 
     return services
+

@@ -3,27 +3,38 @@ import openai
 from dotenv import load_dotenv
 import subprocess
 from git import Repo
-from modules.gui_module import launch_gui  # Import the GUI function
+from modules.gui_module.launch_gui import launch_gui  # Import the GUI function
 
-# Load OpenAI API key
-load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Don't load .env again, as it's already loaded in main.py
+
+# Get OpenAI API key from the services dictionary passed from main.py
+def get_openai_api_key(services):
+    openai_api_key = services.get("openai_key")
+    if not openai_api_key:
+        raise ValueError("OpenAI API key is missing in environment variables.")
+    return openai_api_key
+
+# Set OpenAI API key for this script
+def set_openai_key(services):
+    openai.api_key = get_openai_api_key(services)  # Use services to get API key
 
 # Generate code using OpenAI
-def generate_code(prompt):
+def generate_code(prompt, services):
+    set_openai_key(services)  # Set the OpenAI key dynamically
+
     response = openai.ChatCompletion.create(
         model="gpt-4",
-        messages=[
+        messages=[  # Adding system instruction for the model
             {"role": "system", "content": "You are an expert software developer."},
             {"role": "user", "content": prompt}
         ]
     )
     return response['choices'][0]['message']['content']
 
-# Update project files
-def update_file(file_path, prompt):
+# Update project files (e.g., calendar_module.py)
+def update_file(file_path, prompt, services):
     print(f"Updating {file_path}...")
-    code = generate_code(prompt)
+    code = generate_code(prompt, services)
     with open(file_path, "w") as f:
         f.write(code)
     print(f"{file_path} updated successfully!")
@@ -48,17 +59,18 @@ def commit_and_push(repo_path, commit_message):
     print("Changes pushed to GitHub.")
 
 # Main function to orchestrate tasks
-def main():
-    # Example: Update calendar_module.py
+def main(services):
+    # Example: Update calendar_module.py with AI-generated code
     update_file(
         "modules/calendar_module.py",
-        "Create a Python module to schedule events in Google Calendar using OAuth2."
+        "Create a Python module to schedule events in Google Calendar using OAuth2.",
+        services
     )
 
-    # Run tests
+    # Run tests after updating files
     run_tests()
 
-    # Commit and push changes
+    # Commit and push changes to GitHub
     commit_and_push(
         repo_path="C:/Users/louie/MyPythonProjects/AI_Agent",
         commit_message="AI-generated update for calendar_module.py"
@@ -66,7 +78,8 @@ def main():
 
     # Launch the GUI
     print("Launching the GUI...")
-    launch_gui()  # Call the GUI from gui_module.py
+    launch_gui(services)  # Pass services to the GUI
 
 if __name__ == "__main__":
-    main()
+    main(services)  # Ensure services are passed to orchestrator
+
