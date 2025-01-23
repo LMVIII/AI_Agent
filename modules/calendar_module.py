@@ -1,82 +1,89 @@
-Creating a Python module to schedule events in Google Calendar using OAuth2 involves integrating the Google Calendar API. Here's a simple module named `google_calendar.py` to demonstrate how to authenticate and create an event:
+I won't be able to provide a full, tested solution as it would require an actual Google account and API credits to perform a complete test. However, I can give you a breakdown on how this can be achieved.
 
-First, install the necessary Python libraries:
+Firstly, you will need to install the Google Client Library using pip like:
 
-```shell
-pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib 
+```
+pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
 ```
 
-Here is the `google_calendar.py`:
+You'll need to follow the Python Quickstart guide (https://developers.google.com/calendar/quickstart/python) to setup the `credentials.json` file.
+
+Once you've done this setup, here's the general content of your module:
 
 ```python
+# importing necessary libraries
+from __future__ import print_function
 import datetime
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
-# Define the SCOPES. If modifying these scopes, delete the file token.pickle.
-SCOPES = ['https://www.googleapis.com/auth/calendar.events']
+# the scope for google calendar API
+SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-def auth_google_cal():
-    creds = None
-    # The file token.pickle stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first time
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-    # If there are no (valid) credentials available, prompt the user to log in
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+def create_event(summary, location, description, start_event, end_event, attendees):
+    """
+    Create an event in google calendar
+    """
+
+    credentials = None
+
+    if not credentials or not credentials.valid:
+        if credentials and credentials.expired and credentials.refresh_token:
+            credentials.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES) # 'credentials.json' obtained from Google Cloud Console.
-            creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
-    return creds
+                'credentials.json', SCOPES)
+            credentials = flow.run_local_server(port=0)
 
-def create_event(start_time, end_time, summary, description=None, location=None):
-    creds = auth_google_cal()
-
-    service = build('calendar', 'v3', credentials=creds)
+    service = build('calendar', 'v3', credentials=credentials)
 
     event = {
         'summary': summary,
         'location': location,
         'description': description,
         'start': {
-            'dateTime': start_time.strftime("%Y-%m-%dT%H:%M:%S"),
+            'dateTime': start_event,
             'timeZone': 'America/Los_Angeles',
         },
         'end': {
-            'dateTime': end_time.strftime("%Y-%m-%dT%H:%M:%S"),
+            'dateTime': end_event,
             'timeZone': 'America/Los_Angeles',
         },
-        'reminders': {'useDefault': False},
+        'attendees': [
+            {'email': attendee},
+        ],
+        'reminders': {
+            'useDefault': False,
+            'overrides': [
+                {'method': 'email', 'minutes': 24 * 60},
+                {'method': 'popup', 'minutes': 10},
+            ],
+        },
     }
 
     event = service.events().insert(calendarId='primary', body=event).execute()
-    print('Event created: %s' % (event.get('htmlLink')))
+    print("Event created: %s" % (event.get('htmlLink')))
 
 ```
 
-To use the module to create an event:
+You will need to provide the necessary details like event summary, location, description, start and end times, and the list of attendees (as a list of email addresses) to call your create_event method and create an event.
 
+Remember you'll need to provide the startDate and endDate in the right format: 
+
+```
+dateTime": "2021-05-28T09:00:00-07:00"
+```
+
+The line 
 ```python
-import datetime
-import google_calendar
-
-start_time = datetime.datetime.now()
-end_time = start_time + datetime.timedelta(hours=1)
-
-summary = 'My Event'
-description = 'This is my sample event created for Google Calendar.'
-location = 'My Address, City, State'
-
-google_calendar.create_event(start_time, end_time, summary, description, location)
+flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
 ```
+..expects the credentials.json to be in the same directory as your python script. Please ensure to provide the correct path to your credential file.
+Also note, event times need to be in RFC3339 format.
 
-In the 'credentials.json', replace it with your own OAuth2 credentials (client_id and client_secret) which you can obtain from the Google Cloud Console (https://console.developers.google.com/).
-The first time you run this, it will prompt you to allow the app to access your Google Calendar. It will then store these credentials in a file named 'token.pickle'.
+Apart from this module, remember to follow the complete OAuth2 flow when using the Google API with Python. Provide the expected scopes to ensure your application has the necessary permissions and properly handle token expiry and refreshing.
+
+Remember to secure your credentials.json as it contains sensitive information. Secure transmission and storage of this information should be a top priority.
+
+There are other important aspects not covered here like error handling and managing calendar permissions, but this gives a basic overview of the process.

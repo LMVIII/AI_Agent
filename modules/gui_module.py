@@ -1,9 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import threading
-from modules.job_module import save_jobs_to_file, scheduling_jobs, update_gui
-from modules.utils import STATE_TIMEZONE_MAPPING
-from git import Repo
 import openai
 from dotenv import load_dotenv
 import os
@@ -11,6 +8,27 @@ import os
 # Load environment variables
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
+
+def determine_task_type(prompt):
+    """Use OpenAI to classify the task as 'scheduling' or 'general'."""
+    classification_prompt = f"""
+    Based on the following task, classify it as either 'scheduling' or 'general'.
+    Task: {prompt}
+
+    Guidelines:
+    - If the task involves meetings, scheduling, or clients, classify as 'scheduling'.
+    - Otherwise, classify as 'general'.
+
+    Respond with 'scheduling' or 'general' only.
+    """
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": classification_prompt}]
+        )
+        return response['choices'][0]['message']['content'].strip().lower()
+    except Exception as e:
+        return "general"
 
 def generate_code(prompt):
     """Generate code using OpenAI API."""
@@ -23,39 +41,46 @@ def generate_code(prompt):
     except Exception as e:
         return f"Error generating code: {e}"
 
-def update_file_with_code(file_path, prompt, feedback_area):
-    """Generate code and update the file."""
-    feedback_area.insert(tk.END, f"Generating code for {file_path}...\n")
+def update_file_with_code(prompt, feedback_area):
+    """Generate code and update the file based on AI response."""
+    feedback_area.insert(tk.END, "Connecting to OpenAI API...\n")
     feedback_area.see(tk.END)
 
-    code = generate_code(prompt)
-    if not code or code.startswith("Error"):
-        feedback_area.insert(tk.END, f"Code generation failed: {code}\n")
-        feedback_area.see(tk.END)
-        return
-
     try:
-        with open(file_path, "w") as file:
+        # Generate code and determine file from OpenAI
+        response = generate_code(prompt)
+        file_name, code = response.split("\n\n", 1)
+
+        feedback_area.insert(tk.END, f"Updating file: {file_name.strip()}...\n")
+        feedback_area.see(tk.END)
+
+        # Write code to the file
+        with open(file_name.strip(), "w") as file:
             file.write(code)
-        feedback_area.insert(tk.END, f"Updated {file_path} successfully!\n")
+        feedback_area.insert(tk.END, "File updated successfully!\n")
         feedback_area.see(tk.END)
     except Exception as e:
-        feedback_area.insert(tk.END, f"Error updating file {file_path}: {e}\n")
+        feedback_area.insert(tk.END, f"Error updating file: {e}\n")
         feedback_area.see(tk.END)
 
-def commit_and_push_changes(repo_path, commit_message, feedback_area):
-    """Commit and push changes to GitHub."""
-    try:
-        repo = Repo(repo_path)
-        repo.git.add(all=True)
-        repo.index.commit(commit_message)
-        origin = repo.remote(name='origin')
-        origin.push()
-        feedback_area.insert(tk.END, "Changes pushed to GitHub successfully!\n")
+def execute_ai_task(prompt, feedback_area, scheduling_frame):
+    """Run the AI task and dynamically adjust the GUI."""
+    def ai_task():
+        feedback_area.insert(tk.END, f"Processing AI prompt: {prompt}\n")
         feedback_area.see(tk.END)
-    except Exception as e:
-        feedback_area.insert(tk.END, f"Error committing and pushing changes: {e}\n")
-        feedback_area.see(tk.END)
+
+        # Determine if task is related to scheduling
+        task_type = determine_task_type(prompt)
+        if task_type == "scheduling":
+            feedback_area.insert(tk.END, "Task identified as scheduling.\n")
+            scheduling_frame.pack(pady=10)
+        else:
+            feedback_area.insert(tk.END, "Task identified as general.\n")
+            scheduling_frame.pack_forget()
+
+        update_file_with_code(prompt, feedback_area)
+
+    threading.Thread(target=ai_task).start()
 
 def launch_gui():
     """Launch the main GUI for AI Agent."""
@@ -67,64 +92,40 @@ def launch_gui():
     tk.Label(root, text="What do you want me to do?", font=("Arial", 14, "bold")).pack(pady=10)
 
     # AI Prompt Section
-    ai_prompt_frame = tk.Frame(root)
-    tk.Label(ai_prompt_frame, text="High-Level Task Description:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-    ai_prompt_entry = tk.Entry(ai_prompt_frame, width=60)
+    ai_prompt_entry = tk.Entry(root, width=70)
     ai_prompt_entry.insert(0, "Add logging to the Google Calendar scheduling function.")
-    ai_prompt_entry.grid(row=0, column=1, padx=5, pady=5)
-
-    tk.Label(ai_prompt_frame, text="File to Update:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
-    ai_file_entry = tk.Entry(ai_prompt_frame, width=60)
-    ai_file_entry.insert(0, "modules/calendar_module.py")
-    ai_file_entry.grid(row=1, column=1, padx=5, pady=5)
-    ai_prompt_frame.pack(pady=10)
+    ai_prompt_entry.pack(pady=10)
 
     # Feedback Area for Logs
     feedback_area = scrolledtext.ScrolledText(root, width=100, height=15)
     feedback_area.pack(pady=10)
 
-    # AI Task Execution Button
-    def execute_ai_task():
-        """Run the AI task in a separate thread."""
-        def ai_task():
-            file_path = ai_file_entry.get().strip()
-            prompt = ai_prompt_entry.get().strip()
-
-            if not file_path or not prompt:
-                messagebox.showerror("Error", "Please provide both a file path and a prompt.")
-                return
-
-            feedback_area.insert(tk.END, f"Processing AI prompt: {prompt}\n")
-            feedback_area.see(tk.END)
-
-            update_file_with_code(file_path, prompt, feedback_area)
-
-            commit_message = f"Updated {file_path} with changes: {prompt}"
-            commit_and_push_changes("C:/Users/louie/MyPythonProjects/AI_Agent", commit_message, feedback_area)
-
-        threading.Thread(target=ai_task).start()
-
-    tk.Button(root, text="Run AI Task", command=execute_ai_task, bg="green", fg="white", width=20).pack(pady=10)
-
-    # Existing Scheduling Manager Section
-    tk.Label(root, text="Schedule a Meeting", font=("Arial", 14, "bold")).pack(pady=20)
-
-    tk.Label(root, text="Client Name:").pack(pady=5)
-    client_name_entry = tk.Entry(root, width=50)
+    # Scheduling Section (hidden by default)
+    scheduling_frame = tk.Frame(root)
+    tk.Label(scheduling_frame, text="Client Name:").pack(pady=5)
+    client_name_entry = tk.Entry(scheduling_frame, width=50)
     client_name_entry.pack()
 
-    tk.Label(root, text="Client Email Address:").pack(pady=5)
-    client_email_entry = tk.Entry(root, width=50)
+    tk.Label(scheduling_frame, text="Client Email Address:").pack(pady=5)
+    client_email_entry = tk.Entry(scheduling_frame, width=50)
     client_email_entry.pack()
 
-    tk.Label(root, text="Reason:").pack(pady=5)
+    tk.Label(scheduling_frame, text="Reason:").pack(pady=5)
     reason_combo = ttk.Combobox(
-        root,
+        scheduling_frame,
         values=["Tax Organizer Review", "Financial Statement Review", "Tax Planning & Projections", "Other"],
         width=40,
     )
     reason_combo.pack()
 
-    tk.Button(root, text="Schedule Meeting", command=lambda: print("Meeting scheduled!")).pack(pady=10)
+    # Button to execute the AI task
+    tk.Button(
+        root,
+        text="Run",
+        command=lambda: execute_ai_task(ai_prompt_entry.get(), feedback_area, scheduling_frame),
+        bg="green",
+        fg="white",
+        width=20
+    ).pack(pady=10)
 
     root.mainloop()
