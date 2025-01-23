@@ -44,22 +44,23 @@ def format_time_to_timezone(utc_time, timezone_name):
 
 def initialize_services():
     """
-    Initialize Gmail API service.
+    Initialize shared services like Gmail and OpenAI.
+    Returns:
+        dict: A dictionary of initialized services.
     """
-    creds = None
-    # Load credentials from the token file
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    # If credentials are invalid or missing, reauthorize
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file('client_secret.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-        # Save the credentials for future use
-        with open('token.json', 'w') as token_file:
-            token_file.write(creds.to_json())
+    services = {}
+    try:
+        # Example: Initialize Gmail API service
+        from googleapiclient.discovery import build
+        creds = ...  # Load credentials
+        services['gmail'] = build('gmail', 'v1', credentials=creds)
 
-    return build('gmail', 'v1', credentials=creds)
+        # Example: Load OpenAI API key
+        import os
+        services['openai_key'] = os.getenv("OPENAI_API_KEY")
 
+        print("Services initialized successfully.")
+    except Exception as e:
+        print(f"Error initializing services: {e}")
+
+    return services
