@@ -14,9 +14,9 @@ def main():
     # Initialize shared services (including the OpenAI API key)
     services = initialize_services()
 
-    # Pass the services to orchestrator
+    # Pass the services to orchestrator (import orchestrator and pass services)
     from orchestrator import main as orchestrator_main
-    orchestrator_main(services)
+    orchestrator_main(services)  # Pass services to orchestrator main function
 
     # Launch the GUI with services
     launch_gui(services)

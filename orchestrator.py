@@ -81,6 +81,9 @@ def main(services):
     launch_gui(services)  # Pass services to the GUI
 
 if __name__ == "__main__":
-    main(services)  # Ensure services are passed to orchestrator
+    # Ensure services are passed to orchestrator
+    from modules.utils import initialize_services
+    services = initialize_services()
+    main(services)
 
 
