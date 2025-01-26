@@ -7,7 +7,7 @@ from modules.gui_module.launch_gui import launch_gui  # Import the GUI function
 
 # Don't load .env again, as it's already loaded in main.py
 
-# Get OpenAI API key from the services dictionary passed from main.py
+# Get OpenAI API key from services dictionary passed from main.py
 def get_openai_api_key(services):
     openai_api_key = services.get("openai_key")
     if not openai_api_key:
@@ -85,3 +85,4 @@ if __name__ == "__main__":
     from modules.utils import initialize_services
     services = initialize_services()
     main(services)
+

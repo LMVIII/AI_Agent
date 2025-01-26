@@ -1,89 +1,67 @@
-Sure, I will give you a simple example of how you can work this out. First, you will need to have Google's Python client library and also get `credentials.json` file from Google Cloud Console.
+Here's a basic implementation using Google's Calendar API. This is a simplified example on how you can create the core functionalities of your module.
 
-1. Install the Google Client Library
-```shell
+First, make sure to install the Google client library, you might also need the date-time library.
+
+```sh
 pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
 ```
- 
-2. Get the `credentials.json` file from the [Google Cloud Console](https://console.cloud.google.com/).
-
-3. Python Code:
+Here's a Python module to interact with Google's Calendar API:
 
 ```python
-import os.path
-import pickle
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
-import datetime
+from datetime import datetime, timedelta
 
-# If modifying these SCOPES, delete the file token.pickle.
-SCOPES = ['https://www.googleapis.com/auth/calendar']
+# Load the credentials
+credentials = service_account.Credentials.from_service_account_file(
+    'path/to/your/service/account/key.json'
+)
 
+# Build the service
+service = build('calendar', 'v3', credentials=credentials)
 
-def authenticate_google_account():
-    creds = None
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-    # If there are no (valid) credentials available, let the user log in.
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
-
-    try:
-        service = build('calendar', 'v3', credentials=creds)
-        print('Google account authenticated')
-        return service
-    except Exception as e:
-        print(f'Failed to create service, due to {str(e)}')
-        return None
+# Calendar ID, 'primary' means the current user's calendar
+calendarId = 'primary'
 
 
-def create_event(service):
-    # Call the Calendar API
-    now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
+def add_event(summary, location, description, start_time, end_time):
+    start = start_time.isoformat()
+    end = end_time.isoformat()
 
-    # Set event details
-    event_details = {
-      'summary': 'Event Summary',
-      'location': 'Event Location',
-      'description': 'Event Description',
-      'start': {
-        'dateTime': '2022-12-25T09:00:00-07:00',
-        'timeZone': 'America/New_York',
-      },
-      'end': {
-        'dateTime': '2022-12-25T09:00:00-07:00',
-        'timeZone': 'America/New_York',
-      },
-    }
+    event_result = service.events().insert(calendarId=calendarId,
+                                           body={
+                                               "summary": summary,
+                                               "location": location,
+                                               "description": description,
+                                               "start": {"dateTime": start, "timeZone": 'America/Los_Angeles'},
+                                               "end": {"dateTime": end, "timeZone": 'America/Los_Angeles'},
+                                           }
+                                           ).execute()
 
-    try:
-        events_result = service.events().list(calendarId='primary', timeMin=now,
-                                              maxResults=10, singleEvents=True,
-                                              orderBy='startTime').execute()
+    print("created event")
+    print("id: ", event_result['id'])
+    print("summary: ", event_result['summary'])
+    print("starts at: ", event_result['start']['dateTime'])
+    print("ends at: ", event_result['end']['dateTime'])
 
-        service.events().insert(calendarId='primary', body=event_details).execute()
-        print('Event created')
-    except Exception as e:
-        print(f'Failed to create event, due to {str(e)}')
-
-
+    
+# Usage example
 if __name__ == '__main__':
-    service = authenticate_google_account()
-    if service:
-        create_event(service)
+    add_event(
+        "Meeting with Bob",
+        "123 Main St",
+        "Discuss the Q4 sales forecast",
+        datetime.now() + timedelta(days=1),
+        datetime.now() + timedelta(days=1, hours=1)
+    )
 ``` 
 
-This code authenticates the user and inserts an event into the user's primary calendar. The `authenticate_google_account` function authenticates the user's Google account and the `create_event` function creates an event in the Google Calendar.
+The `add_event()` function creates an event and prints some useful information about it.
 
-Please note that this is a simple example. There may be numerous scenarios where you want to handle possible exceptions and other things according to your application's requirements. Also ensure you have valid `credentials.json` file and correct SCOPES for accessing the Google Calendar API.
+Please replace `'path/to/your/service/account/key.json' with the actual path to your key file.
+
+Also take note that you need to enable the Google Calendar API in the developer console to get your service account, which allows server-to-server interaction.
+
+Additionally, this is only a basic start. You may need to handle exceptions and edge cases depending on your specific use-case. 
+
+The Google Calendar API has many more features you can take advantage of, such as updating or deleting events, listing them, adding attendees, and much more. For more about Google Calendar API, you can check the official documentation: https://developers.google.com/calendar
