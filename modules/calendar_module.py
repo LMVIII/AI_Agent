@@ -1,67 +1,79 @@
-Here's a basic implementation using Google's Calendar API. This is a simplified example on how you can create the core functionalities of your module.
+Sure, to handle this task, you will need to set up Google Calendar API and get the credentials.json file:
 
-First, make sure to install the Google client library, you might also need the date-time library.
+1. Go to Google Cloud Console: https://console.cloud.google.com/
+2. Create a new project or select an existing one.
+3. Enable Google Calendar API for that project.
+4. Setup OAuth2.0 by creating new credentials -> OAuth client Id -> Web application -> Authorized redirect URIs -> http://localhost:8000/
+5. Download the JSON file, rename it as credentials.json
 
-```sh
-pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
-```
-Here's a Python module to interact with Google's Calendar API:
+Now you can start developing the Python script. Below is a sample module that you can use as a reference:
 
 ```python
-from google.oauth2 import service_account
+import os.path
+import datetime
+from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from datetime import datetime, timedelta
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 
-# Load the credentials
-credentials = service_account.Credentials.from_service_account_file(
-    'path/to/your/service/account/key.json'
-)
+# If modifying these SCOPES, delete the file token.json.
+SCOPES = ['https://www.googleapis.com/auth/calendar.events']
 
-# Build the service
-service = build('calendar', 'v3', credentials=credentials)
+def setup_api():
+    """Setup the Google Calendar API."""
+    creds = None
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json')
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                'credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        # Save the credentials for the next run
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
 
-# Calendar ID, 'primary' means the current user's calendar
-calendarId = 'primary'
+    service = build('calendar', 'v3', credentials=creds)
+    return service
 
+def schedule_event(start_time_str, end_time_str, summary, description, location):
+    """Schedule a new event."""
+    service = setup_api()
 
-def add_event(summary, location, description, start_time, end_time):
-    start = start_time.isoformat()
-    end = end_time.isoformat()
+    event = {
+      'summary': summary,
+      'location': location,
+      'description': description,
+      'start': {
+        'dateTime': start_time_str,
+        'timeZone': 'America/Los_Angeles',
+      },
+      'end': {
+        'dateTime': end_time_str,
+        'timeZone': 'America/Los_Angeles',
+      },
+      'reminders': {
+        'useDefault': False,
+        'overrides': [
+          {'method': 'email', 'minutes': 24 * 60},
+          {'method': 'popup', 'minutes': 10},
+        ],
+      },
+    }
 
-    event_result = service.events().insert(calendarId=calendarId,
-                                           body={
-                                               "summary": summary,
-                                               "location": location,
-                                               "description": description,
-                                               "start": {"dateTime": start, "timeZone": 'America/Los_Angeles'},
-                                               "end": {"dateTime": end, "timeZone": 'America/Los_Angeles'},
-                                           }
-                                           ).execute()
+    event = service.events().insert(calendarId='primary', body=event).execute()
+    print(f'Event created: {event["htmlLink"]}')
+```
 
-    print("created event")
-    print("id: ", event_result['id'])
-    print("summary: ", event_result['summary'])
-    print("starts at: ", event_result['start']['dateTime'])
-    print("ends at: ", event_result['end']['dateTime'])
+You can use this module's `schedule_event` function to schedule events. It takes the start and end times as string in 'yyyy-mm-ddThh:mm:ss' format, the summary (name of the event), the description and the location as input.
 
-    
-# Usage example
-if __name__ == '__main__':
-    add_event(
-        "Meeting with Bob",
-        "123 Main St",
-        "Discuss the Q4 sales forecast",
-        datetime.now() + timedelta(days=1),
-        datetime.now() + timedelta(days=1, hours=1)
-    )
-``` 
+Note that before the first usage of script, consider installing necessary packages with pip
+```sh
+pip install --upgrade google-auth-oauthlib google-auth-httplib2 google-api-python-client
+```
 
-The `add_event()` function creates an event and prints some useful information about it.
+And you should run Python scripts on a server with a running browser for an OAuth2 authentication process. The OAuth2 authorization process leads a user to the link which should be followed to allow application access to the Google Calendar events. Upon successful authorization, 'token.json' will be created, which should be saved for consequent usages.
 
-Please replace `'path/to/your/service/account/key.json' with the actual path to your key file.
-
-Also take note that you need to enable the Google Calendar API in the developer console to get your service account, which allows server-to-server interaction.
-
-Additionally, this is only a basic start. You may need to handle exceptions and edge cases depending on your specific use-case. 
-
-The Google Calendar API has many more features you can take advantage of, such as updating or deleting events, listing them, adding attendees, and much more. For more about Google Calendar API, you can check the official documentation: https://developers.google.com/calendar
+Please replace 'America/Los_Angeles' with your time zone.
