@@ -1,78 +1,85 @@
-Sure, below you can find an example of a Python module for scheduling events in Google Calendar using OAuth2. Please replace `'credentials.json'` with your actual credentials json file provided by your Google Cloud Console.
+Creating a Python script to add events to Google Calendar involves several steps. We need to set up a project on Google Cloud Console, install Google Client libraries, and write a Python script.
+
+First, you need to setup your OAuth2 credentials.
+
+1. Go to the Google Cloud Console (https://console.developers.google.com/)
+2. Create a new project
+3. Enable Google Calendar API for that project
+4. Create credentials for the API
+5. When asked which API you are using, select "Google Calendar API v3"
+6. When asked where you will be calling the API from, choose "Other UI (e.g., Windows, CLI tool)".
+7. When asked what data you will be accessing, select "User data".
+8. You should now see a dialog box saying that you need to setup the OAuth consent screen. Click "Setup consent screen"
+9. Fill out the necessary fields on this page. You can use your local development environment as the Authorized domain.
+10. Now create an OAuth 2.0 Client ID. Name it and then click "Create".
+11. Download the JSON for your credentials.
+
+Now let's start writing Python code to access the Google Calendar API.
+
+1. Create a Python file (say, google_calendar.py)
+2. Install the necessary libraries if you have not already (google-api-python-client, google-auth-httplib2, google-auth-oauthlib, google-auth, oauthlib) using pip command. 
 
 ```python
-# You need to install google-auth, google-auth-oauthlib, google-auth-httplib2 and google-api-python-client libraries
-# You can install using pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib google-auth oauthlib
+```
 
+Here is the Python code:
+
+```python
 import datetime
-import json
-import os.path
-from google.auth.transport.requests import Request
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
 
-# If modifying these SCOPES, delete the file token.json.
-SCOPES = ['https://www.googleapis.com/auth/calendar']
+# The scope URL for read/write access to a user's calendar
+SCOPES = 'https://www.googleapis.com/auth/calendar'
 
-class GoogleCalendarEventScheduler:
-
-    def __init__(self):
-        """
-        Shows basic usage of the Google Calendar API.
-        Lists the next 10 events on the user's calendar.
-        """
-        creds = None
-        # The file token.json stores the user's access and refresh tokens, and is
-        # created automatically when the authorization flow completes for the first
-        # time.
-        if os.path.exists('token.json'):
-            with open('token.json', 'r') as token:
-                creds = json.load(token)
-
-        # If there are no (valid) credentials available, let the user log in.
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-                creds = flow.run_local_server(port=0)
-
-            # Save the credentials for the next run
-            with open('token.json', 'w') as token:
-                token.write(creds.to_json())
-                
-        self.service = build('calendar', 'v3', credentials=creds)
+CREDENTIALS_FILE = 'path_to_your_downloaded_json_file'
 
 
-    def add_event(self, calendar_id, event):
-        """
-        Adds an event to the specified calendar_id.
-        :param calendar_id: str, ID of the calendar where the event will be added.
-        :param event: dict, The event to add to the calendar.
-        :return: event object if successful, None otherwise.
-        """
-        try:
-            event = self.service.events().insert(calendarId=calendar_id, body=event).execute()
-        except Exception as e:
-            print(f'An error occurred: {e}')
-            return None
-        return event
+def add_event_to_calendar(summary, location, description, start_time, end_time):
+    """Adds an event to the user's calendar"""
+    # Use the client_secret.json file to authenticate and create an API client
+    creds = None
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
+            creds = flow.run_local_server(port=0)
+        
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
+
+    service = build('calendar', 'v3', credentials=creds)
+
+    event_result = service.events().insert(calendarId='primary',
+        body={
+            "summary": summary,
+            "location": location,
+            "description": description,
+            "start": {
+                "dateTime": start_time,
+                "timeZone": 'America/Los_Angeles',
+            },
+            "end": {
+                "dateTime": end_time,
+                "timeZone": 'America/Los_Angeles',
+            },
+        }
+    ).execute()
+
+    return event_result['id']
+
+
+if __name__ == '__main__':
+    add_event_to_calendar('Meeting with Bob', 'Zoom', 'Discuss about project',
+                          '2022-12-01T09:00:00', '2022-12-01T10:00:00')
 ```
-You can use this library like this:
-```python
-gcal = GoogleCalendarEventScheduler()
-event = {
-  'summary': 'Google I/O 2015',
-  'location': '800 Howard St., San Francisco, CA 94103',
-  'description': 'A chance to hear more about Google\'s developer products.',
-  'start': {
-    'dateTime': '2015-05-28T09:00:00-07:00',
-    'timeZone': 'America/Los_Angeles',
-  },
-  'end': {
-    'dateTime': '2015-05-28T17:00:00-07:00',
-    'timeZone': 'America/Los_Angeles',
-  },
-}    
-ev = gcal.add_event('primary', event)
-```
+
+This will add an event of a meeting with Bob on 1st Dec 2022 from 9am to 10am. Replace variables as per your requirement and make sure to provide the correct path to your downloaded JSON file. Note: the first time you run the script, it will open a new window in your default web browser asking you to authorize the app to access your Google Calendar data. Once you authorize it, it will store a token.pickle file containing the refresh token so that you won't have to re-authenticate every time.
+
+Please note: Google's OAuth2 implementation may require the web server to obtain consent from the user to access their Google Calendar data. This might not work in a headless environment or where a web server and browser are not available.

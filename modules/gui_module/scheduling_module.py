@@ -62,55 +62,62 @@ def scheduling_module(content_frame, feedback_area, services):
     clear_frame(content_frame)
 
     # Title
-    tk.Label(content_frame, text="Scheduling Module", font=("Arial", 14, "bold")).grid(row=0, column=0, pady=10)
+    tk.Label(content_frame, text="Scheduling Module", font=("Arial", 14, "bold")).grid(row=0, column=0, columnspan=2, pady=10)
 
     # Input fields (using grid for better control)
-    client_name_entry = create_labeled_entry(content_frame, "Client Name:", 0, 1)
-    client_email_entry = create_labeled_entry(content_frame, "Client Email Address:", 1, 1)
+    client_name_entry = create_labeled_entry(content_frame, "Client Name:", 1, 0)
+    client_email_entry = create_labeled_entry(content_frame, "Client Email Address:", 2, 0)
 
-    tk.Label(content_frame, text="Reason:").grid(row=2, column=0, pady=5, sticky="w")
+    tk.Label(content_frame, text="Reason:").grid(row=3, column=0, pady=5, sticky="w")
     reason_combo = ttk.Combobox(
         content_frame,
         values=["Tax Organizer Review", "Financial Statement Review", "Tax Planning & Projections", "Other"],
         width=40
     )
-    reason_combo.grid(row=2, column=1, pady=5)
+    reason_combo.grid(row=3, column=1, pady=5)
 
     # Time zone field
-    tk.Label(content_frame, text="Time Zone:").grid(row=3, column=0, pady=5, sticky="w")
+    tk.Label(content_frame, text="Time Zone:").grid(row=4, column=0, pady=5, sticky="w")
     timezone_combo = ttk.Combobox(
         content_frame,
         values=["PST", "EST", "CST", "MST"],
         width=40
     )
-    timezone_combo.grid(row=3, column=1, pady=5)
+    timezone_combo.grid(row=4, column=1, pady=5)
 
     # Priority level field
-    tk.Label(content_frame, text="Priority Level:").grid(row=4, column=0, pady=5, sticky="w")
+    tk.Label(content_frame, text="Priority Level:").grid(row=5, column=0, pady=5, sticky="w")
     priority_combo = ttk.Combobox(
         content_frame,
         values=["1", "2", "3"],
         width=40
     )
-    priority_combo.grid(row=4, column=1, pady=5)
+    priority_combo.grid(row=5, column=1, pady=5)
 
     # Secondary and third person selection
-    tk.Label(content_frame, text="Secondary Person:").grid(row=5, column=0, pady=5, sticky="w")
+    tk.Label(content_frame, text="Secondary Person:").grid(row=6, column=0, pady=5, sticky="w")
     secondary_person_combo = ttk.Combobox(
         content_frame,
         values=STAFF_EMAILS,
         width=40
     )
-    secondary_person_combo.grid(row=5, column=1, pady=5)
+    secondary_person_combo.grid(row=6, column=1, pady=5)
 
-    tk.Label(content_frame, text="Third Person (Optional):").grid(row=6, column=0, pady=5, sticky="w")
+    tk.Label(content_frame, text="Third Person (Optional):").grid(row=7, column=0, pady=5, sticky="w")
     third_person_combo = ttk.Combobox(
         content_frame,
         values=STAFF_EMAILS,
         width=40
     )
-    third_person_combo.grid(row=6, column=1, pady=5)
+    third_person_combo.grid(row=7, column=1, pady=5)
 
+    # Tracker for scheduling progress
+    tracker_label = tk.Label(content_frame, text="Scheduling Progress:", font=("Arial", 12))
+    tracker_label.grid(row=8, column=0, pady=10, sticky="w")
+    
+    tracker_area = tk.Text(content_frame, height=4, width=40)  # Wider rectangle
+    tracker_area.grid(row=9, column=0, columnspan=2, pady=10)
+    
     def schedule_task():
         client_name = client_name_entry.get().strip()
         client_email = client_email_entry.get().strip()
@@ -148,7 +155,7 @@ def scheduling_module(content_frame, feedback_area, services):
         bg="green",
         fg="white",
         width=20
-    ).grid(row=7, column=0, columnspan=2, pady=10)
+    ).grid(row=10, column=0, columnspan=2, pady=10)
 
 # Utility functions (clear_frame, create_labeled_entry, log_to_feedback)
 def clear_frame(frame):
@@ -165,3 +172,4 @@ def log_to_feedback(feedback_area, message):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     feedback_area.insert(tk.END, f"[{timestamp}] {message}\n")
     feedback_area.see(tk.END)
+
