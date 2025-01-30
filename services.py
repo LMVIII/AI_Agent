@@ -19,3 +19,6 @@ def get_services():
         raise ValueError("OpenAI API key is missing in environment variables.")
     
     return services
+
+
+

@@ -1,74 +1,75 @@
-Creating a Python module that interacts with Google's API requires implementing OAuth2 for accessing user info, handling dependencies like the Google Client Library, setting up Google Cloud, creating credentials, and more. Below is a baseline for creating a Google Calendar event via a Python script. You need to use the `google-api-python-client` and `google-auth-httplib2` and `google-auth-oauthlib` libraries for this.
+To schedule events in Google Calendar, we'd require Google's Calendar API. Below is a sample Python script that will create a new event on Google Calendar:
 
-You can install these libraries using pip:
+Note that for it to work, you'd need to set up OAuth2 authentication and download a 'credentials.json' file from the Google Developer Console.
+
+1. You have to create an Google Developer Console project, setup OAuth2 authentication and download 'credentials.json' file.
+
+2. Enable the Google Calendar API for your project.
+
+3. Install the required Python libraries:
 
 ```bash
 pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
 ```
 
-Now we can write the Python script,
-
-Note that you need to provide your own credential.json file you created from your Google Cloud account.
+4. Create Python module:
 
 ```python
-#Remember to replace "credentials.json" with your own file.
+# import required libraries
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
-
-import os.path
-import datetime
-import pickle
-
 from googleapiclient.discovery import build
+import datetime
+import os
 
-# If modifying these SCOPES, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-def create_event():
-    """Shows basic usage of the Google Calendar API.
-    Lists the next 10 events on the user's calendar.
-    """
+def service_account_login():
     creds = None
-    # The file token.pickle stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-    # If there are no (valid) credentials available, let the user log in.
+
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
-
+            
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
+            
     service = build('calendar', 'v3', credentials=creds)
+    return service
 
-    # Call the Calendar API
-    now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
-    print(f'Getting the upcoming 10 events')
-    events_result = service.events().list(calendarId='primary', timeMin=now,
-                                          maxResults=10, singleEvents=True,
-                                          orderBy='startTime').execute()
-    events = events_result.get('items', [])
+def create_event(service, summary, location, description, start_time, end_time, attendees=None):
+    event = {
+        'summary': summary,
+        'location': location,
+        'description': description,
+        'start': {
+            'dateTime': start_time,
+            'timeZone': 'America/Los_Angeles',
+        },
+        'end': {
+            'dateTime': end_time,
+            'timeZone': 'America/Los_Angeles',
+        },
+        'attendees': [],
+    }
+    
+    for attendee in attendees or []:
+        event['attendees'].append({'email': attendee})
 
-    if not events:
-        print('No upcoming events found.')
-    for event in events:
-        start = event['start'].get('dateTime', event['start'].get('date'))
-        print(start, event['summary'])
+    event = service.events().insert(calendarId='primary', body=event).execute()
 
+    print(f"Event created: {event['htmlLink']}")
 ```
 
-Please note: "credentials.json" is a file that is downloaded after creating credentials for your project in Google Cloud Platform's APIs & Services pages. Make sure to save this file and replace `'credentials.json'` with your own file's path. This file stores your `Client ID` and `Client secret`. 
-Without it, Google does not know who you are and won't allow the creation of calendars.
+The 'create_event' function can be used to create an event in Google Calendar. You can add event name(summary), location, and start-end datetime in required format.
 
-Also note: The above program is only for getting the events already present in the calendar, for creating an event you need to call `service.events().insert()` with the event data. 
+Output will return you the link of the created event.
 
-Make sure to enable the Google Calendar API from your Google Cloud Project and take a look at Python Quickstart of Google Calendar API here: https://developers.google.com/calendar/quickstart/python for more information.
+Note: Activities like reading a file from the disk or introducing a delay into an application are considered outside the norm for the use-case provided, thus you will have to implement this using your own Python environment.

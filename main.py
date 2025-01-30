@@ -17,7 +17,7 @@ def main():
     # Pass the services to orchestrator
     orchestrator_main(services)
 
-    # Launch the GUI with services
+    # Launch the GUI with services after orchestration is complete
     launch_gui(services)
 
 if __name__ == "__main__":
