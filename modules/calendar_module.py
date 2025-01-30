@@ -1,23 +1,27 @@
-Sure, Here is a Python module that schedules events in Google Calendar using OAuth2. Please note that due to security reasons, we are not filling in client_id and client_secret here. Also, make sure that you have Google client library - if not please do pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+Sure, I can provide you an example of how to create a Python module used for scheduling events in Google Calendar using OAuth 2. However, this is just an example and the actual Google's APIs require you to create OAuth 2.0 Client ID which won't be provided in the code. Please refer to API documentation for more details.
+
+Creating a new Google Calendar event involves multiple steps:
+1. Set up the Google Calendar API
+2. Download and set up the client configuration
+3. Create a Python script
+
+Below is an example Python module. Replace 'credentials.json' with the path to your downloaded client configuration, and fill in your own details in 'EVENT': 
 
 ```python
-import os.path
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
 import datetime
+import os.path
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
 
-def schedule_event(summary, location, description, start_time, end_time):
-    # If modifying these scopes, delete the file token.pickle.
-    SCOPES = ['https://www.googleapis.com/auth/calendar']
+# If modifying these SCOPES, delete the file 'token.json'
+SCOPES = ['https://www.googleapis.com/auth/calendar']
 
+def schedule_event():
     creds = None
-    # The file token.pickle stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-    # If there are no (valid) credentials available, let the user log in.
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
@@ -25,47 +29,50 @@ def schedule_event(summary, location, description, start_time, end_time):
             flow = InstalledAppFlow.from_client_secrets_file(
                 'credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run.
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
 
     service = build('calendar', 'v3', credentials=creds)
 
-    # Call the Calendar API.
-    now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
+    # Call the Calendar API
 
-    event_result = service.events().insert(
-        calendarId='primary',
-        body={
-            'summary': summary,
-            'location': location,
-            'description': description,
-            'start': {
-                'dateTime': start_time,
-                'timeZone': 'UTC',
-            },
-            'end': {
-                'dateTime': end_time,
-                'timeZone': 'UTC',
-            },
-            'reminders': {
-                'useDefault': False,
-                'overrides': [
-                    {'method': 'email', 'minutes': 24 * 60},
-                    {'method': 'popup', 'minutes': 10},
-                ],
-            },
-        }
-    ).execute()
+    # 'Z' indicates UTC time
+    start_time = datetime.datetime(2021, 11, 1, 7, 30, 0)
+    end_time = start_time + datetime.timedelta(hours=1)
+    timezone = 'America/Los_Angeles'
 
-    print('Event created: %s' % (event_result.get('htmlLink')))
+    event = {
+        'summary': 'Python developer meeting',
+        'location': 'Your Location',
+        'description': 'Discuss about upcoming software project',
+        'start': {
+            'dateTime': start_time.strftime("%Y-%m-%dT%H:%M:%S"),
+            'timeZone': timezone,
+        },
+        'end': {
+            'dateTime': end_time.strftime("%Y-%m-%dT%H:%M:%S"),
+            'timeZone': timezone,
+        },
+        'reminders': {
+            'useDefault': False,
+            'overrides': [
+                {'method': 'email', 'minutes': 24 * 60},
+                {'method': 'popup', 'minutes': 10},
+            ],
+        },
+    }
 
-if __name__ == "__main__":
-    schedule_event('Test Event', 'Test Location', 'Test Description', '2022-11-16T15:00:00', '2022-11-16T18:00:00')
+    event = service.events().insert(calendarId='primary', body=event).execute()
+    print(f'Event created: {event["htmlLink"]}')
+
+if __name__ == '__main__':
+    schedule_event()
 ```
 
-Before running the script, you will need to download credentials.json from your Google Cloud Console where you have enabled the Calendar API. The client_id and client_secret are inside this file. 
+This Python script will prompt you for permission to access your Google Calendar and save an 'token.json' file for subsequent uses. 
 
-The token.pickle file will be created automatically after the first run of the script and the user logged into his Google account where he has given access to. This file contains the user's access and refresh tokens. 
+Make sure to replace the start_time, end_time, and timezone with your desired date, time, and timezones respectively. Variables 'summary', 'location', and 'description' should also be customized according to your event's details.
 
-This module does not handle errors; in a production environment you would want to add error handling.
+For more information and tutorials, see Python Quickstart on Google Calendar API Python docs: https://developers.google.com/calendar/quickstart/python
+
+Remember that you need a 'credentials.json' file downloaded from Google Cloud Console -> APIs & Services -> Credentials. You have to create a project, then create credentials for OAuth Client ID. After that, you should be able to download the 'credentials.json' file.
