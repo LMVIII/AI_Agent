@@ -1,64 +1,88 @@
-Sure, let's break it down into steps:
+Let's create a Python module that is able to schedule events in Google Calendar using OAuth2. The module goes as follows:
 
-First, you need to install the Google Client Library. You can do this by using the following command:
-```python
-    pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
-```
-Create a new python module named `google_calendar.py`:
+File: gcal_event_manager.py
 
 ```python
-    from googleapiclient.discovery import build
-    from google_auth_oauthlib.flow import InstalledAppFlow
-    import datetime
+import datetime
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
 
-    # Set the scopes and discovery file
-    SCOPES = ['https://www.googleapis.com/auth/calendar']
-    DISCOVERY_FILE = "/path/to/client_secret.json"
 
-    def authenticate_google_account():
-        flow = InstalledAppFlow.from_client_secrets_file(DISCOVERY_FILE, SCOPES)
-        credentials = flow.run_console()
-        return build('calendar', 'v3', credentials=credentials)
+SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-    def create_event(service, start_time_str, summary, duration=1, description=None, location=None):
-        end_time = datetime.datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S") + \
-                   datetime.timedelta(hours=duration)
+def get_credentials():
+    creds = None
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json')
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                'credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
+    return creds
 
-        event_result = service.events().insert(
-            calendarId='primary',
-            body={
-                "summary": summary,
-                "description": description,
-                "location": location,
-                "start": {
-                    "dateTime": start_time_str,
-                    "timeZone": 'Your_Time_Zone',
-                },
-                "end": {
-                    "dateTime": end_time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "timeZone": 'Your_Time_Zone',
-                },
-            }
-        ).execute()
+def create_event(summary, location, description, start_time, end_time):
+    creds = get_credentials()
+    service = build('calendar', 'v3', credentials=creds)
 
-        print(f'Created event {event_result["id"]}')
-        return event_result
+    event = {
+        'summary': summary,
+        'location': location,
+        'description': description,
+        'start': {
+            'dateTime': start_time.isoformat(),
+            'timeZone': 'America/Los_Angeles',
+        },
+        'end': {
+            'dateTime': end_time.isoformat(),
+            'timeZone': 'America/Los_Angeles',
+        },
+    }
+
+    event = service.events().insert(calendarId='primary', body=event).execute()
+    print(f"Event created: {event['htmlLink']}")
+
+def delete_event(event_id):
+    creds = get_credentials()
+    service = build('calendar', 'v3', credentials=creds)
+    service.events().delete(calendarId='primary', eventId=event_id).execute()
+    print(f"Event deleted: {event_id}")
+
+def get_event(event_id):
+    creds = get_credentials()
+    service = build('calendar', 'v3', credentials=creds)
+    event = service.events().get(calendarId='primary', eventId=event_id).execute()
+    return event
 ```
-Please replace "Your_Time_Zone" with your time zone, "/path/to/client_secret.json" with a path to your OAuth 2.0 client secret json file. You can get the "client_secret.json" file from Google Cloud Console.
 
-Then, you can use it to create an event:
+This module provides functionality for creating, getting and deleting events in your primary Google Calendar. 
+
+Be sure to replace 'America/Los_Angeles' with your actual timezone, and also note that 'start_time' and 'end_time' must be datetime objects.
+
+To correctly use OAuth2 you first need to activate the Google Calendar API for your Google account and download the `credentials.json` file. Then, run any function from this file: the script will open a new page in your browser asking for permissions. After giving them, the script will store these access permissions locally in a `token.json` file. 
+
+Usage examples:
+
 ```python
-    if __name__ == '__main__':
-        service = authenticate_google_account()
-        create_event(service, '2023-06-09 09:00:00', 'Doctor Appointment', 1,
-                     'First check-up', '123 abc street')
+import datetime
+from gcal_event_manager import create_event, get_event, delete_event
+
+# Create Event
+start_time = datetime.datetime(2022, 5, 20, 10, 0, 0)
+end_time = datetime.datetime(2022, 5, 20, 11, 0, 0)
+create_event("Meeting with Bob", "Zoom", "Discuss project X", start_time, end_time)
+
+# Get Event
+event_id = "abcdefghijkl"
+print(get_event(event_id))
+
+# Delete Event
+delete_event(event_id)
 ```
-This will create a 1-hour long appointment on June 9th, 2023 at 9:00am.
-
-Please note:
-
-1. Go through the OAuth Consent Screen and grant permission during the execution of the script.
-2. The start time format is important and always needs to be in "Y-m-d H:M:S".
-3. The date, details and other settings could be modified to better suit your needs.
-4. OAuth2 require you to enable the Google Calendar API on the Google Cloud Console and create a project.
-5. Use care with your client_secret.json file - it contains keys that should be kept private and not shared or exposed publicly.
+Remember: Do not publish your 'credentials.json' and 'token.json' files in public repositories for security issues.
