@@ -1,28 +1,21 @@
-Sure, here's how you might approach it. The detailed implementation would use the Google Calendar API and Google's OAuth2.0 authentication.
+Creating a Python module to schedule events in Google Calendar using OAuth2 authentication involves multiple steps and requires some dependencies. Here is an example of how you might set up the basics of a module like this:
 
 ```python
-import datetime
-import json
-import os.path
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
+import os.path
+import pickle
 
-# If modifying these SCOPES, delete the file token.json.
-SCOPES = ['https://www.googleapis.com/auth/calendar.events']
+# The SCOPES your module needs to access Google Calendar
+SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-def schedule_event(summary, location, description, start_time, end_time):
-    """Shows basic usage of the Google Calendar API.
-    Lists the next specified events on the user's calendar.
-    """
+def get_credentials():
     creds = None
-    # The file token.json stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json')
-    # If there are no (valid) credentials available, prompt the user to log in.
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
@@ -30,47 +23,41 @@ def schedule_event(summary, location, description, start_time, end_time):
             flow = InstalledAppFlow.from_client_secrets_file(
                 'credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
+    return creds
 
-    service = build('calendar', 'v3', credentials=creds)
-
+def schedule_event(start_time, summary, duration=1, attendees=None, description=None):
+    service = build('calendar', 'v3', credentials=get_credentials())
+    # Here you needs to write detailed implementation on how you're going to prepare 'event' object.
+    # 'event' object might look like: 
     event = {
-      'summary': summary,
-      'location': location,
-      'description': description,
-      'start': {
-        'dateTime': start_time,
+    'summary': summary,
+    'location': '', 
+    'description': description, 
+    'start': {
+        'dateTime': start_time, 
+        'timeZone': 'America/Los_Angeles', 
+        },
+    'end': {
+        'dateTime': start_time+datetime.timedelta(hours=duration),
         'timeZone': 'America/Los_Angeles',
-      },
-      'end': {
-        'dateTime': end_time,
-        'timeZone': 'America/Los_Angeles',
-      },
-      'reminders': {
-        'useDefault': False,
-        'overrides': [
-          {'method': 'email', 'minutes': 24 * 60},
-          {'method': 'popup', 'minutes': 10},
+        },
+    'attendees': [
+        {'email': attendee},
         ],
-      },
     }
-
+    
+    # Call the Calendar API
     event = service.events().insert(calendarId='primary', body=event).execute()
-    print(f"Event created: {event.get('htmlLink')}")
+    print(f'Event created: {event.get("htmlLink")}')
 
 ```
 
-This script defines a function `schedule_event` that takes the details of an event as parameters, and schedules it on the authenticated user's Google Calendar. You can modify it per your needs.
+Note: 
+- You will need to have a 'credentials.json' file present in your application's directory. This file can be obtained by enabling the Google Calendar API in your Google Cloud Console.
+- This code will open a web page where you need to allow the permissions for your Google account and then it will store the token in a 'token.pickle' file for future uses.
+- This code assumes that 'start_time' is passed as a datetime object so please make sure to import the datetime module. Also, 'attendees' should be a list of email addresses.
+- Also, detailed implementation regarding how to prepare the 'event' object in detail. Please refer Google Calendar Events Insert API documentation (https://developers.google.com/calendar/api/v3/reference/events/insert) for the same.
 
-Remember, before running the module, you have to create a project on Google Cloud Console, enable calendar API and download the client configuration file and rename as 'credentials.json' to the root directory of your project, you can refer to the official Google API Python client guide. 
-
-Note also, this is a simple implementation. For Production grade code, consider error handling, invalid inputs, security, testing etc.
-Please replace `'America/Los_Angeles'` with appropriate timezone.
-
-Make sure you have installed required libraries, using below commands you can install those,
-
-```bash
-pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
-```
+This sample code above is a starting point which will need to be extended and adjusted to suit your specific requirements and the specific data structures of your application.
