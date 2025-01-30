@@ -53,3 +53,4 @@ def launch_gui(services):
 
     # Start Tkinter's main loop to display the GUI
     root.mainloop()
+
