@@ -1,85 +1,79 @@
-Creating a Python script to add events to Google Calendar involves several steps. We need to set up a project on Google Cloud Console, install Google Client libraries, and write a Python script.
+Creating a Python module to schedule events in Google Calendar using OAuth2 involves interacting with Google's Calendar API. Here is a basic example of how you can achieve this:
 
-First, you need to setup your OAuth2 credentials.
+This module relies on Google's `oauthlib` for OAuth2, and the `google-auth`, `google-auth-httplib2`, and `google-auth-oauthlib`, and `google-api-python-client` libraries, so make you sure you have these installed on your Python environment.
 
-1. Go to the Google Cloud Console (https://console.developers.google.com/)
-2. Create a new project
-3. Enable Google Calendar API for that project
-4. Create credentials for the API
-5. When asked which API you are using, select "Google Calendar API v3"
-6. When asked where you will be calling the API from, choose "Other UI (e.g., Windows, CLI tool)".
-7. When asked what data you will be accessing, select "User data".
-8. You should now see a dialog box saying that you need to setup the OAuth consent screen. Click "Setup consent screen"
-9. Fill out the necessary fields on this page. You can use your local development environment as the Authorized domain.
-10. Now create an OAuth 2.0 Client ID. Name it and then click "Create".
-11. Download the JSON for your credentials.
+You can install them using pip:
 
-Now let's start writing Python code to access the Google Calendar API.
-
-1. Create a Python file (say, google_calendar.py)
-2. Install the necessary libraries if you have not already (google-api-python-client, google-auth-httplib2, google-auth-oauthlib, google-auth, oauthlib) using pip command. 
-
-```python
-pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib google-auth oauthlib
+```bash
+pip install google-auth google-auth-httplib2 google-auth-oauthlib google-api-python-client
 ```
 
-Here is the Python code:
+Below is the module `google_cal.py`:
 
 ```python
+import os.path
 import datetime
-from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
 
-# The scope URL for read/write access to a user's calendar
-SCOPES = 'https://www.googleapis.com/auth/calendar'
+# If modifying these scopes, delete your saved credentials
+SCOPES = ['https://www.googleapis.com/auth/calendar.events']
 
-CREDENTIALS_FILE = 'path_to_your_downloaded_json_file'
-
-
-def add_event_to_calendar(summary, location, description, start_time, end_time):
-    """Adds an event to the user's calendar"""
-    # Use the client_secret.json file to authenticate and create an API client
+def service_account_login(creds_file):
     creds = None
+    # Check if the token.pickle file exists as it contains your credentials.
     if os.path.exists('token.pickle'):
         with open('token.pickle', 'rb') as token:
             creds = pickle.load(token)
+            
+    # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file(
+                creds_file, SCOPES)
             creds = flow.run_local_server(port=0)
-        
+        # Store the credentials for the next run
         with open('token.pickle', 'wb') as token:
             pickle.dump(creds, token)
-
     service = build('calendar', 'v3', credentials=creds)
 
-    event_result = service.events().insert(calendarId='primary',
-        body={
-            "summary": summary,
-            "location": location,
-            "description": description,
-            "start": {
-                "dateTime": start_time,
-                "timeZone": 'America/Los_Angeles',
-            },
-            "end": {
-                "dateTime": end_time,
-                "timeZone": 'America/Los_Angeles',
-            },
-        }
-    ).execute()
+    return service
 
-    return event_result['id']
+def create_event(service):
+    event = {
+      'summary': 'Google Calendar event from Python',
+      'location': '800 Howard St., San Francisco, CA 94103',
+      'description': 'A newly created event from Python module',
+      'start': {
+        'dateTime': '2022-09-28T09:00:00-07:00',
+        'timeZone': 'America/Los_Angeles',
+      },
+      'end': {
+        'dateTime': '2022-09-28T17:00:00-07:00',
+        'timeZone': 'America/Los_Angeles',
+      },
+      'recurrence': [
+        'RRULE:FREQ=DAILY;COUNT=2'
+      ],
+    }
 
-
+    event = service.events().insert(calendarId='primary', body=event).execute()
+    print('Event created: %s' % (event.get('htmlLink')))
+    
 if __name__ == '__main__':
-    add_event_to_calendar('Meeting with Bob', 'Zoom', 'Discuss about project',
-                          '2022-12-01T09:00:00', '2022-12-01T10:00:00')
+    creds_file = 'credentials.json' # Add path to your credentials.json file
+    service = service_account_login(creds_file)
+    create_event(service)
 ```
 
-This will add an event of a meeting with Bob on 1st Dec 2022 from 9am to 10am. Replace variables as per your requirement and make sure to provide the correct path to your downloaded JSON file. Note: the first time you run the script, it will open a new window in your default web browser asking you to authorize the app to access your Google Calendar data. Once you authorize it, it will store a token.pickle file containing the refresh token so that you won't have to re-authenticate every time.
+This module enables OAuth2 with Google services and uses these credentials to create an event in your primary Google Calendar.
 
-Please note: Google's OAuth2 implementation may require the web server to obtain consent from the user to access their Google Calendar data. This might not work in a headless environment or where a web server and browser are not available.
+Ensure you have the `credentials.json` file downloaded from the Google Cloud Console for OAuth2.0 Client IDs (Application type: Desktop app) as per this guide:
+https://developers.google.com/workspace/guides/create-credentials
+
+And remember to replace values in `create_event` method like 'summary', 'location', 'description', 'start', 'end' and 'recurrence' with your actual info.
+
+Note: The user must authenticate themselves with their Google account when running the python script. The user will be redirected to their web browser and asked to log in with their Google account.
