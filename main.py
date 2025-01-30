@@ -19,7 +19,7 @@ def main():
 
     # Launch the GUI with services after orchestration is complete
     try:
-        launch_gui(services)
+        launch_gui(services)  # Launch the GUI
     except KeyboardInterrupt:
         # Gracefully exit if the user interrupts the process (e.g., closes GUI)
         print("GUI closed, exiting...")
@@ -27,7 +27,8 @@ def main():
         print(f"Unexpected error during GUI launch: {e}")
     finally:
         # Ensure the program exits once the GUI is closed
-        print("Exiting application...")
+        print("GUI has been closed.")
+        exit()  # Exit immediately after closing the GUI
 
 if __name__ == "__main__":
     main()

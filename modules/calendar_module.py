@@ -1,27 +1,28 @@
-Sure, I can provide you an example of how to create a Python module used for scheduling events in Google Calendar using OAuth 2. However, this is just an example and the actual Google's APIs require you to create OAuth 2.0 Client ID which won't be provided in the code. Please refer to API documentation for more details.
+Creating a Python module that interacts with the Google Calendar API to schedule events involves several steps. Here's a guide, but note that this gets in-depth and advanced very quickly. 
 
-Creating a new Google Calendar event involves multiple steps:
-1. Set up the Google Calendar API
-2. Download and set up the client configuration
-3. Create a Python script
+This program assumes you have Python properly installed on your device, and then you should install the required Python libraries using pip.
 
-Below is an example Python module. Replace 'credentials.json' with the path to your downloaded client configuration, and fill in your own details in 'EVENT': 
+```bash
+pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+```
+
+Following is a skeleton of a Python module named `gcal_scheduler.py` using OAuth2:
 
 ```python
-import datetime
-import os.path
+import os
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
+import datetime
 
-# If modifying these SCOPES, delete the file 'token.json'
+# If modifying these SCOPES, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-def schedule_event():
+def google_calendar_service():
     creds = None
     if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        creds = Credentials.from_authorized_user_file('token.json')
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
@@ -31,48 +32,49 @@ def schedule_event():
             creds = flow.run_local_server(port=0)
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
+    return build('calendar', 'v3', credentials=creds)
 
-    service = build('calendar', 'v3', credentials=creds)
 
-    # Call the Calendar API
+def create_event(service, calendar_id: str, start_time_str: str, end_time_str: str, 
+                 summary: str, description: str, location: str):
+    start = datetime.datetime.strptime(start_time_str, "%Y-%m-%dT%H:%M:%S")
+    end = datetime.datetime.strptime(end_time_str, "%Y-%m-%dT%H:%M:%S")
 
-    # 'Z' indicates UTC time
-    start_time = datetime.datetime(2021, 11, 1, 7, 30, 0)
-    end_time = start_time + datetime.timedelta(hours=1)
-    timezone = 'America/Los_Angeles'
+    event_result = service.events().insert(calendarId=calendar_id, 
+                                           body={
+                                               "summary": summary,
+                                               "description": description,
+                                               "start": {"dateTime": start.isoformat()},
+                                               "end": {"dateTime": end.isoformat()},
+                                               "location": location,
+                                           }
+                                           ).execute()
 
-    event = {
-        'summary': 'Python developer meeting',
-        'location': 'Your Location',
-        'description': 'Discuss about upcoming software project',
-        'start': {
-            'dateTime': start_time.strftime("%Y-%m-%dT%H:%M:%S"),
-            'timeZone': timezone,
-        },
-        'end': {
-            'dateTime': end_time.strftime("%Y-%m-%dT%H:%M:%S"),
-            'timeZone': timezone,
-        },
-        'reminders': {
-            'useDefault': False,
-            'overrides': [
-                {'method': 'email', 'minutes': 24 * 60},
-                {'method': 'popup', 'minutes': 10},
-            ],
-        },
-    }
+    return event_result['id']
 
-    event = service.events().insert(calendarId='primary', body=event).execute()
-    print(f'Event created: {event["htmlLink"]}')
 
-if __name__ == '__main__':
-    schedule_event()
+if __name__ == "__main__":
+    # Call this function to get the google calendar service object 
+    service = google_calendar_service() 
+
+    # event details
+    start = "2019-07-25T00:00:00"
+    end = "2019-07-26T00:00:00"
+    summary = "Meeting with Bob"
+    description = "Discuss the new project"
+    location = "Conference Room A"
+
+    calendar_id = 'primary' # add your calendar id here
+
+    create_event(service, calendar_id, start, end, summary, description, location)
 ```
 
-This Python script will prompt you for permission to access your Google Calendar and save an 'token.json' file for subsequent uses. 
+This code first tries to authenticate using the saved `token.json` file. If it's not present or is invalid, it falls back to using `credentials.json` and saves a new `token.json` file.
 
-Make sure to replace the start_time, end_time, and timezone with your desired date, time, and timezones respectively. Variables 'summary', 'location', and 'description' should also be customized according to your event's details.
+`create_event` function accepts event details and makes a request to Google Calendar API to create an event.
 
-For more information and tutorials, see Python Quickstart on Google Calendar API Python docs: https://developers.google.com/calendar/quickstart/python
+The `credentials.json` file contains your OAuth2 client ID and secret. You can get it from https://console.cloud.google.com/apis/credentials after creating a project and enabling the Google Calendar API.
 
-Remember that you need a 'credentials.json' file downloaded from Google Cloud Console -> APIs & Services -> Credentials. You have to create a project, then create credentials for OAuth Client ID. After that, you should be able to download the 'credentials.json' file.
+The code above uses the 'primary' calendar. If you want to use a different calendar, replace 'primary' with your calendar ID.
+
+This is a very basic script, and for production use you should add more error checking/handling, etc.
