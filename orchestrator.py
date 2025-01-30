@@ -2,6 +2,7 @@ import openai
 import subprocess
 from git import Repo
 from modules.gui_module.launch_gui import launch_gui  # Import the GUI function
+from services import get_services  # Import get_services from services.py
 
 # Get OpenAI API key from services dictionary passed from main.py
 def get_openai_api_key(services):
@@ -78,8 +79,5 @@ def main(services):
 
 if __name__ == "__main__":
     # Ensure services are passed to orchestrator
-    from modules.utils import initialize_services
-    services = initialize_services()
+    services = get_services()  # Get services from services.py
     main(services)
-
-
