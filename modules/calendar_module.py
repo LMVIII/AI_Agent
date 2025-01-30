@@ -1,29 +1,38 @@
-Sure, creating such a module would require a couple of steps and knowing certain key information such as your client_id, client_secret, and refresh_token from Google API.
+Creating a Python module that interacts with Google's API requires implementing OAuth2 for accessing user info, handling dependencies like the Google Client Library, setting up Google Cloud, creating credentials, and more. Below is a baseline for creating a Google Calendar event via a Python script. You need to use the `google-api-python-client` and `google-auth-httplib2` and `google-auth-oauthlib` libraries for this.
 
-Here is a basic example of a python module to create Google calendar events. We will use the Google Client Library to interact with the Google Calendar API.
+You can install these libraries using pip:
 
-First, install necessary libraries:
 ```bash
 pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
 ```
 
-Python module to schedule events in Google Calendar:
+Now we can write the Python script,
+
+Note that you need to provide your own credential.json file you created from your Google Cloud account.
 
 ```python
-from __future__ import print_function
-import datetime
-import pickle
-import os.path
+#Remember to replace "credentials.json" with your own file.
+from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
-# If modifying these SCOPES, delete the file token.pickle.
-SCOPES = ['https://www.googleapis.com/auth/calendar.events']
+import os.path
+import datetime
+import pickle
 
-def create_google_calendar_event(event):
+from googleapiclient.discovery import build
+
+# If modifying these SCOPES, delete the file token.pickle.
+SCOPES = ['https://www.googleapis.com/auth/calendar']
+
+def create_event():
     """Shows basic usage of the Google Calendar API.
-    Lists the next 10 events on the user's calendar."""
+    Lists the next 10 events on the user's calendar.
+    """
     creds = None
+    # The file token.pickle stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time.
     if os.path.exists('token.pickle'):
         with open('token.pickle', 'rb') as token:
             creds = pickle.load(token)
@@ -41,33 +50,25 @@ def create_google_calendar_event(event):
 
     service = build('calendar', 'v3', credentials=creds)
 
-    event_result = service.events().insert(calendarId='primary', body=event).execute()
+    # Call the Calendar API
+    now = datetime.datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
+    print(f'Getting the upcoming 10 events')
+    events_result = service.events().list(calendarId='primary', timeMin=now,
+                                          maxResults=10, singleEvents=True,
+                                          orderBy='startTime').execute()
+    events = events_result.get('items', [])
 
-    print('Event created: %s' % (event_result.get('htmlLink')))
+    if not events:
+        print('No upcoming events found.')
+    for event in events:
+        start = event['start'].get('dateTime', event['start'].get('date'))
+        print(start, event['summary'])
 
 ```
 
-Please replace `'credentials.json'` with your downloaded JSON file of credentials from Google Cloud Console.
+Please note: "credentials.json" is a file that is downloaded after creating credentials for your project in Google Cloud Platform's APIs & Services pages. Make sure to save this file and replace `'credentials.json'` with your own file's path. This file stores your `Client ID` and `Client secret`. 
+Without it, Google does not know who you are and won't allow the creation of calendars.
 
-This is a very basic example, you should add error checking, exception handling, and modify it according to your needs. For production use, it is strongly recommended to follow Google's best practices for using OAuth 2.0.
+Also note: The above program is only for getting the events already present in the calendar, for creating an event you need to call `service.events().insert()` with the event data. 
 
-After creating this module you can call `create_google_calendar_event` function from your code by passing it a dictionary event.
-
-Example:
-```python
-event = {
-  'summary': 'Sample Event',
-  'location': 'Enter location',
-  'description': 'Event Description
-  'start': {
-    'dateTime': '2022-01-09T09:00:00-07:00',
-    'timeZone': 'America/Los_Angeles',
-  },
-  'end': {
-    'dateTime': '2022-01-09T17:00:00-07:00',
-    'timeZone': 'America/Los_Angeles',
-  }
-}
-
-create_google_calendar_event(event)
-```
+Make sure to enable the Google Calendar API from your Google Cloud Project and take a look at Python Quickstart of Google Calendar API here: https://developers.google.com/calendar/quickstart/python for more information.
