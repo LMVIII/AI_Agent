@@ -19,7 +19,7 @@ def main():
 
     # Launch the GUI with services after orchestration is complete
     try:
-        launch_gui(services)
+        launch_gui(services)  # Launch the GUI
     except KeyboardInterrupt:
         # Gracefully exit if the user interrupts the process
         print("GUI closed, exiting...")
