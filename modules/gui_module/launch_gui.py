@@ -52,5 +52,10 @@ def launch_gui(services):
     general_module(content_frame, feedback_area, services)
 
     # Start Tkinter's main loop to display the GUI
-    root.mainloop()
+    try:
+        root.mainloop()
+    except Exception as e:
+        print(f"Error during GUI execution: {e}")
+    finally:
+        print("GUI has been closed.")
 

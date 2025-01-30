@@ -1,79 +1,77 @@
-Creating a Python module to schedule events in Google Calendar using OAuth2 involves interacting with Google's Calendar API. Here is a basic example of how you can achieve this:
+In python, the `google-auth`, `google-auth-oauthlib`, `google-auth-httplib2`, `google-api-python-client` libraries are necessary to work with Google services API like Google calendar, Google drive etc. 
 
-This module relies on Google's `oauthlib` for OAuth2, and the `google-auth`, `google-auth-httplib2`, and `google-auth-oauthlib`, and `google-api-python-client` libraries, so make you sure you have these installed on your Python environment.
-
-You can install them using pip:
-
-```bash
-pip install google-auth google-auth-httplib2 google-auth-oauthlib google-api-python-client
-```
-
-Below is the module `google_cal.py`:
+You can install these libraries using pip:
 
 ```python
-import os.path
+pip install --upgrade google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
+```
+
+Below is the Python module for scheduling events in Google Calendar using OAuth2:
+
+```python
 import datetime
+from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
 
-# If modifying these scopes, delete your saved credentials
-SCOPES = ['https://www.googleapis.com/auth/calendar.events']
+# If modifying these scopes, delete the file token.pickle.
+SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-def service_account_login(creds_file):
+
+def service_account_login():
     creds = None
-    # Check if the token.pickle file exists as it contains your credentials.
+
+    # The file token.pickle stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time.
     if os.path.exists('token.pickle'):
         with open('token.pickle', 'rb') as token:
             creds = pickle.load(token)
-            
+
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
-                creds_file, SCOPES)
+                'credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
-        # Store the credentials for the next run
+
+        # Save the credentials for the next run
         with open('token.pickle', 'wb') as token:
             pickle.dump(creds, token)
-    service = build('calendar', 'v3', credentials=creds)
 
-    return service
+    return build('calendar', 'v3', credentials=creds)
 
-def create_event(service):
-    event = {
-      'summary': 'Google Calendar event from Python',
-      'location': '800 Howard St., San Francisco, CA 94103',
-      'description': 'A newly created event from Python module',
-      'start': {
-        'dateTime': '2022-09-28T09:00:00-07:00',
-        'timeZone': 'America/Los_Angeles',
-      },
-      'end': {
-        'dateTime': '2022-09-28T17:00:00-07:00',
-        'timeZone': 'America/Los_Angeles',
-      },
-      'recurrence': [
-        'RRULE:FREQ=DAILY;COUNT=2'
-      ],
-    }
 
-    event = service.events().insert(calendarId='primary', body=event).execute()
-    print('Event created: %s' % (event.get('htmlLink')))
-    
+def create_event(service, summary, location, description, start_time_str, end_time_str, attendees):
+    # Call the Calendar API
+    start_time = datetime.datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
+    end_time = datetime.datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
+    event_result = service.events().insert(calendarId='primary',
+                                           body={
+                                               "summary": summary,
+                                               "location": location,
+                                               "description": description,
+                                               "start": {"dateTime": start_time.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": 'Asia/Kolkata'},
+                                               "end": {"dateTime": end_time.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": 'Asia/Kolkata'},
+                                               "attendees": attendees,
+                                           }
+                                           ).execute()
+
+    return event_result['id']
+
+
 if __name__ == '__main__':
-    creds_file = 'credentials.json' # Add path to your credentials.json file
-    service = service_account_login(creds_file)
-    create_event(service)
+    service = service_account_login()
+    attendees = [{"email": 'attendee1@gmail.com'}, {"email": 'attendee2@gmail.com'}]
+    create_event(service, 'Meeting with Team', 'Office', 'Discuss about the product', 
+                 '2021-09-24 15:00:00', '2021-09-24 16:30:00', 
+                 attendees)
+
 ```
+Please remember to replace 'credentials.json' with the path to your actual credentials file.
+This script will open a new window to authenticate via google OAuth2, you only need to do this once, your tokens will be stored in token.pickle for future usage. 
 
-This module enables OAuth2 with Google services and uses these credentials to create an event in your primary Google Calendar.
-
-Ensure you have the `credentials.json` file downloaded from the Google Cloud Console for OAuth2.0 Client IDs (Application type: Desktop app) as per this guide:
-https://developers.google.com/workspace/guides/create-credentials
-
-And remember to replace values in `create_event` method like 'summary', 'location', 'description', 'start', 'end' and 'recurrence' with your actual info.
-
-Note: The user must authenticate themselves with their Google account when running the python script. The user will be redirected to their web browser and asked to log in with their Google account.
+Creating an event with Google Calendar needs a calendarId, in this case, it is 'primary' to represent the primary calendar of the user, you can change it if you want to use other calendars. 
+A time zone is also specified for the start and end time of the event. The attendees are a list of email addresses in dict format. Other optional arguments can also be added, please check the Google Calendar API for more details.

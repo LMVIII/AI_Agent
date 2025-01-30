@@ -20,8 +20,11 @@ def main():
     # Launch the GUI with services after orchestration is complete
     try:
         launch_gui(services)
+    except KeyboardInterrupt:
+        # Gracefully exit if the user interrupts the process
+        print("GUI closed, exiting...")
     except Exception as e:
-        print(f"Error launching the GUI: {e}")
+        print(f"Unexpected error during GUI launch: {e}")
 
 if __name__ == "__main__":
     main()
