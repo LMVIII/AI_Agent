@@ -4,7 +4,6 @@ from modules.gui_module.general_module import general_module
 from modules.gui_module.scheduling_module import scheduling_module
 from modules.gui_module.coding_module import coding_module
 
-
 def launch_gui(services):
     """
     Launch the main GUI for the Mongoose AI Agent.
@@ -52,4 +51,5 @@ def launch_gui(services):
     # Load default module
     general_module(content_frame, feedback_area, services)
 
+    # Start Tkinter's main loop to display the GUI
     root.mainloop()

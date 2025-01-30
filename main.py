@@ -18,7 +18,10 @@ def main():
     orchestrator_main(services)
 
     # Launch the GUI with services after orchestration is complete
-    launch_gui(services)
+    try:
+        launch_gui(services)
+    except Exception as e:
+        print(f"Error launching the GUI: {e}")
 
 if __name__ == "__main__":
     main()
