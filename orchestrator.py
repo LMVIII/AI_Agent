@@ -1,7 +1,6 @@
 import openai
 import subprocess
 from git import Repo
-# No need to import launch_gui here anymore
 
 def get_openai_api_key(services):
     openai_api_key = services.get("openai_key")
@@ -31,12 +30,15 @@ def update_file(file_path, prompt, services):
 
 def run_tests():
     print("Running tests...")
-    result = subprocess.run(["pytest"], capture_output=True, text=True)
-    print(result.stdout)
-    if result.returncode == 0:
-        print("All tests passed!")
-    else:
-        print("Some tests failed. Check the output above.")
+    try:
+        result = subprocess.run(["pytest"], capture_output=True, text=True)
+        print(result.stdout)
+        if result.returncode == 0:
+            print("All tests passed!")
+        else:
+            print("Some tests failed. Check the output above.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error during test execution: {e}")
 
 def commit_and_push(repo_path, commit_message):
     repo = Repo(repo_path)
@@ -60,6 +62,6 @@ def main(services):
                     commit_message="AI-generated update for calendar_module.py")
 
 if __name__ == "__main__":
+    from services import get_services
     services = get_services()  # Get services from services.py
     main(services)
-
