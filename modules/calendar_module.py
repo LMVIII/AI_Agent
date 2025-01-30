@@ -1,77 +1,70 @@
-In python, the `google-auth`, `google-auth-oauthlib`, `google-auth-httplib2`, `google-api-python-client` libraries are necessary to work with Google services API like Google calendar, Google drive etc. 
+Before we go ahead, note that before you can use the Google Calendar API, you should have a project with a configured OAuth2.0 client downloaded as a JSON file. Downloaded json file should be in your working directory as this will be used for authenticating your application. Once you have that, you can start creating your Python app.
 
-You can install these libraries using pip:
+Here's a simple way to create a Python module to schedule events in Google Calendar using OAuth2:
 
-```python
+Install required libraries, google-auth, google-auth-oauthlib, google-auth-httplib2, and google-api-python-client, using pip:
+```sh
 pip install --upgrade google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
 ```
 
-Below is the Python module for scheduling events in Google Calendar using OAuth2:
+You can now create the Python module(let's name it `calendar_event.py`):
 
 ```python
+import os.path
 import datetime
-from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
 
-# If modifying these scopes, delete the file token.pickle.
+# If modifying these SCOPES, delete the file token.json
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 
-def service_account_login():
+def authenticate_google_account():
     creds = None
-
-    # The file token.pickle stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first
-    # time.
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-
-    # If there are no (valid) credentials available, let the user log in.
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json')
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
+                'client_secret.json', SCOPES)
             creds = flow.run_local_server(port=0)
-
-        # Save the credentials for the next run
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
 
     return build('calendar', 'v3', credentials=creds)
 
 
-def create_event(service, summary, location, description, start_time_str, end_time_str, attendees):
-    # Call the Calendar API
-    start_time = datetime.datetime.strptime(start_time_str, "%Y-%m-%d %H:%M:%S")
-    end_time = datetime.datetime.strptime(end_time_str, "%Y-%m-%d %H:%M:%S")
-    event_result = service.events().insert(calendarId='primary',
-                                           body={
-                                               "summary": summary,
-                                               "location": location,
-                                               "description": description,
-                                               "start": {"dateTime": start_time.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": 'Asia/Kolkata'},
-                                               "end": {"dateTime": end_time.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": 'Asia/Kolkata'},
-                                               "attendees": attendees,
-                                           }
-                                           ).execute()
+def schedule_event(service, event):
+    return service.events().insert(calendarId='primary', body=event).execute()
 
-    return event_result['id']
+
+def create_event(summary, location, description, start_time_str, end_time_str):
+    return {
+        'summary': summary,
+        'location': location,
+        'description': description,
+        'start': {
+            'dateTime': start_time_str,
+            'timeZone': 'America/Los_Angeles',
+        },
+        'end': {
+            'dateTime': end_time_str,
+            'timeZone': 'America/Los_Angeles',
+        },
+    }
 
 
 if __name__ == '__main__':
-    service = service_account_login()
-    attendees = [{"email": 'attendee1@gmail.com'}, {"email": 'attendee2@gmail.com'}]
-    create_event(service, 'Meeting with Team', 'Office', 'Discuss about the product', 
-                 '2021-09-24 15:00:00', '2021-09-24 16:30:00', 
-                 attendees)
-
+    service = authenticate_google_account()
+    event = create_event('Google I/O 2022', '800 Howard St., San Francisco, CA 94103',
+                         'A chance to learn about Google\'s latest developer products.',
+                         datetime.datetime.now().isoformat(), (datetime.datetime.now() + datetime.timedelta(hours=2)).isoformat())
+    scheduled_event = schedule_event(service, event)
+    print('Event created: %s' % (scheduled_event.get('htmlLink')))
 ```
-Please remember to replace 'credentials.json' with the path to your actual credentials file.
-This script will open a new window to authenticate via google OAuth2, you only need to do this once, your tokens will be stored in token.pickle for future usage. 
 
-Creating an event with Google Calendar needs a calendarId, in this case, it is 'primary' to represent the primary calendar of the user, you can change it if you want to use other calendars. 
-A time zone is also specified for the start and end time of the event. The attendees are a list of email addresses in dict format. Other optional arguments can also be added, please check the Google Calendar API for more details.
+This is a maximum simplified and clear example, make sure to measure all risks and potential security wholes in case of making it a production part of your software. Creating real-world application may require a lot more, like secret management, error-checking and handling, retries, user-interface, deployment scripts, etc. But you can use this to further extend as per your use case.
