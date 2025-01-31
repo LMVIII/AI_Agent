@@ -5,6 +5,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 import os
 import pickle
+import pytz
 
 # Google Calendar API Scopes
 SCOPES = ['https://www.googleapis.com/auth/calendar']
@@ -77,13 +78,13 @@ def scheduling_module(content_frame, feedback_area, services):
     reason_combo.grid(row=3, column=1, pady=5)
 
     # Time zone field
-    tk.Label(content_frame, text="Time Zone:").grid(row=4, column=0, pady=5, sticky="w")
-    timezone_combo = ttk.Combobox(
+    tk.Label(content_frame, text="Client Time Zone:").grid(row=4, column=0, pady=5, sticky="w")
+    client_timezone_combo = ttk.Combobox(
         content_frame,
         values=["PST", "EST", "CST", "MST"],
         width=40
     )
-    timezone_combo.grid(row=4, column=1, pady=5)
+    client_timezone_combo.grid(row=4, column=1, pady=5)
 
     # Priority level field
     tk.Label(content_frame, text="Priority Level:").grid(row=5, column=0, pady=5, sticky="w")
@@ -117,12 +118,13 @@ def scheduling_module(content_frame, feedback_area, services):
     
     tracker_area = tk.Text(content_frame, height=4, width=40)  # Wider rectangle
     tracker_area.grid(row=9, column=0, columnspan=2, pady=10)
-    
+
+    # Adjust button and text placement for better alignment
     def schedule_task():
         client_name = client_name_entry.get().strip()
         client_email = client_email_entry.get().strip()
         reason = reason_combo.get().strip()
-        timezone = timezone_combo.get().strip()
+        timezone = client_timezone_combo.get().strip()
         priority = priority_combo.get().strip()
         secondary_person = secondary_person_combo.get().strip()
         third_person = third_person_combo.get().strip()
@@ -138,6 +140,20 @@ def scheduling_module(content_frame, feedback_area, services):
         # Define start and end times (you can make this dynamic based on user input)
         start_time = "2025-01-01T10:00:00"
         end_time = "2025-01-01T11:00:00"
+
+        # Adjust start and end times based on the client's time zone
+        client_tz = pytz.timezone(timezone)
+        pst_tz = pytz.timezone('America/Los_Angeles')
+
+        start_time_pst = datetime(2025, 1, 1, 10, 0, 0, tzinfo=pst_tz)
+        start_time_client = start_time_pst.astimezone(client_tz)
+
+        end_time_pst = datetime(2025, 1, 1, 11, 0, 0, tzinfo=pst_tz)
+        end_time_client = end_time_pst.astimezone(client_tz)
+
+        # Convert datetime to string for event creation
+        start_time = start_time_client.strftime('%Y-%m-%dT%H:%M:%S')
+        end_time = end_time_client.strftime('%Y-%m-%dT%H:%M:%S')
 
         # Attendees: client + secondary + third person
         attendees = [client_email, secondary_person, third_person]
