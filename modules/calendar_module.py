@@ -1,27 +1,52 @@
-Sure. Here's a simple Python module that uses Google's API client and OAuth2 to create events on a user's Google Calendar.
+To create Python module to schedule events in Google Calendar using OAuth2, we first need to install some necessary libraries using pip:
 
-For simplicity, we'll name this module `gcal.py`. Before you run the code, remember you have to obtain valid client_id, client_secret, and refresh_token from Google API Console, which involve enabling the Google Calendar API for your project and setting up OAuth2 credentials.
+```bash
+pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+```
+
+Then, you can create a Google Calendar API on Google Cloud Platform and download your credentials.json file.
+
+Here is a basic Python module that you can use to schedule events:
 
 ```python
-import os
-from google.oauth2.credentials import Credentials
+from __future__ import print_function
+import datetime
+import pickle
+import os.path
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
-import datetime
-import pytz
 from googleapiclient.discovery import build
+import datefinder
 
 # If modifying these SCOPES, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-def get_calendar_service():
-    """Shows basic usage of the Google Calendar API.
-        Returns the Google Calendar API service.
-    """
+def scheduled_event(start_time_str, summary, duration=1, description=None, location=None):
+    start_time = list(datefinder.find_dates(start_time_str))[0]
+    end_time = start_time + datetime.timedelta(hours=duration)
+
+    event = {
+        'summary': summary,
+        'location': location,
+        'description': description,
+        'start': {
+            'dateTime': start_time.strftime("%Y-%m-%dT%H:%M:%S"),
+            'timeZone': 'America/Los_Angeles',
+        },
+        'end': {
+            'dateTime': end_time.strftime("%Y-%m-%dT%H:%M:%S"),
+            'timeZone': 'America/Los_Angeles',
+        },
+    }
+
     creds = None
+    # The file token.pickle stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time.
     if os.path.exists('token.pickle'):
         with open('token.pickle', 'rb') as token:
             creds = pickle.load(token)
+            
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -34,44 +59,15 @@ def get_calendar_service():
         with open('token.pickle', 'wb') as token:
             pickle.dump(creds, token)
 
-    try:
-        service = build('calendar', 'v3', credentials=creds)
-        return service
-    except Exception as e:
-        print(e)
-        return None
+    service = build('calendar', 'v3', credentials=creds)
 
-def create_event(start_time_str, end_time_str, summary, description=None, location=None):
-    service = get_calendar_service()
+    result = service.events().insert(calendarId='primary', body=event).execute()
+    print('Event created: %s' % (result.get('htmlLink'))
 
-    event_result = service.events().insert(calendarId='primary',
-        body={
-            "summary": summary,
-            "description": description,
-            "location": location,
-            "start": {"dateTime": start_time_str, "timeZone": 'Asia/Kolkata'}, 
-            "end": {"dateTime": end_time_str, "timeZone": 'Asia/Kolkata'},
-        }
-    ).execute()
-
-    print("created event")
-    print("id: ", event_result['id'])
-    print("summary: ", event_result['summary'])
-    print("starts at: ", event_result['start']['dateTime'])
-    print("ends at: ", event_result['end']['dateTime'])
-
+# testing the function
+# it schedules an event for tomorrow 9 AM PST
+scheduled_event("tomorrow at 9 AM", "Test Event")
 ```
+Make sure to replace 'credentials.json' with the path to your actual credentials file. This code will create an event for the primary calendar of the user who authorized the application. 'token.pickle' stores the user's access and refresh tokens after successful login.
 
-The `get_calendar_service` function uses OAuth2 to connect to the user's Google account, returning a service object that can be used to interact with the Google Calendar API.
-
-The `create_event` function takes the start time, end time, event summary, description (optional), and location (optional) as parameters.
-
-Please note that you need to modify according to your time zone in create_event function. Here I used 'Asia/Kolkata' as a timezone. 
-
-To use this module to create an event, you would do something like:
-```python
-import gcal
-gcal.create_event('2023-05-25T14:30:00', '2023-05-25T15:30:00', 'My Event', 'This is description', 'Zoom')
-```
-
-This will create an event on 25th May 2023 from 14:30 to 15:30 with the title 'My Event' and description 'This is description'. The location is 'Zoom'. The dateTime must be an ISO8601 timestamp.
+Note that the code above assumes the target timezone is America/Los_Angeles. Please adjust those to fit your specific use case.

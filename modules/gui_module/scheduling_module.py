@@ -1,16 +1,17 @@
-import tkinter as tk
-from tkinter import ttk
-from datetime import datetime
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
 import os
 import pickle
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from google.auth.transport.requests import Request
+from datetime import datetime, timedelta
 import pytz
+import tkinter as tk
+from tkinter import ttk
 
 # Google Calendar API Scopes
-SCOPES = ['https://www.googleapis.com/auth/calendar']
+SCOPES = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/gmail.send']
 
-# Updated Staff emails with Louie and Erin
+# List of staff emails
 STAFF_EMAILS = [
     "andrew@profitandwealthtaxadvisors.com",
     "priscilla@profitandwealthtaxadvisors.com",
@@ -22,30 +23,52 @@ STAFF_EMAILS = [
 ADMIN_EMAIL = "admin@profitandwealthtaxadvisors.com"
 
 # Function to authenticate Google Calendar API
-def authenticate_google_account():
+def authenticate_google_account(email=None):
+    """Handles Google OAuth authentication for a specific email."""
     creds = None
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
+    # Use a separate token file for each email (e.g., token_andrew.pickle, token_priscilla.pickle, etc.)
+    token_filename = f'token_{email}.pickle' if email else 'token.pickle'
+    
+    # Check if the token file already exists
+    if os.path.exists(token_filename):
+        with open(token_filename, 'rb') as token:
             creds = pickle.load(token)
+    
+    # If no credentials or the credentials are invalid, request new ones
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
-        with open('token.pickle', 'wb') as token:
+        
+        # Save the credentials for the next run
+        with open(token_filename, 'wb') as token:
             pickle.dump(creds, token)
     
-    return build('calendar', 'v3', credentials=creds)
+    return build('calendar', 'v3', credentials=creds), build('gmail', 'v1', credentials=creds)
 
-# Function to create a Google Calendar event
+# Function to authenticate the admin email and staff emails
+def authenticate_all_accounts():
+    """Authenticate the admin account and all staff accounts."""
+    # Authenticate the admin account
+    admin_service, admin_gmail_service = authenticate_google_account(ADMIN_EMAIL)
+
+    # Authenticate all staff accounts and store services in a dictionary
+    staff_services = {}
+    for email in STAFF_EMAILS:
+        staff_services[email] = authenticate_google_account(email)[0]  # Only calendar service is needed for staff
+
+    return admin_service, admin_gmail_service, staff_services
+
+# Function to create an event on the admin calendar
 def create_event(service, summary, start_time, end_time, attendees):
+    """Create a Google Calendar event."""
     event = {
         'summary': summary,
         'start': {
             'dateTime': start_time,
-            'timeZone': 'America/Los_Angeles',
+            'timeZone': 'America/Los_Angeles',  # Admin calendar time zone
         },
         'end': {
             'dateTime': end_time,
@@ -57,6 +80,30 @@ def create_event(service, summary, start_time, end_time, attendees):
     event = service.events().insert(calendarId=ADMIN_EMAIL, body=event).execute()
     print(f"Event created: {event.get('htmlLink')}")
     return event
+
+# Function to send confirmation and rescheduling emails (client only)
+def send_email(service, to, subject, body):
+    """Send an email using the Gmail API."""
+    message = {
+        'to': to,
+        'subject': subject,
+        'body': body,
+    }
+    create_message(service, to, subject, body)
+
+def create_message(service, to, subject, body):
+    """Create the email message and send it using the Gmail API."""
+    message = service.users().messages().send(
+        userId="me", body={
+            'raw': create_raw_message(to, subject, body)
+        }
+    ).execute()
+    print(f"Message sent to {to}: {subject}")
+
+def create_raw_message(to, subject, body):
+    """Create a raw email message."""
+    message = f"To: {to}\r\nSubject: {subject}\r\n\r\n{body}\r\n\nBest regards,\nYour Team at Profit and Wealth Tax Advisors"
+    return message.encode('utf-8').decode('ascii')
 
 # Function to handle scheduling task
 def scheduling_module(content_frame, feedback_area, services):
@@ -119,7 +166,7 @@ def scheduling_module(content_frame, feedback_area, services):
     tracker_area = tk.Text(content_frame, height=4, width=40)  # Wider rectangle
     tracker_area.grid(row=9, column=0, columnspan=2, pady=10)
 
-    # Adjust button and text placement for better alignment
+    # Authenticate and create event
     def schedule_task():
         client_name = client_name_entry.get().strip()
         client_email = client_email_entry.get().strip()
@@ -134,8 +181,8 @@ def scheduling_module(content_frame, feedback_area, services):
             log_to_feedback(feedback_area, "Error: All fields are required.")
             return
 
-        # Schedule event using Google Calendar API
-        service = authenticate_google_account()
+        # Authenticate and create event using Google Calendar API
+        admin_service, admin_gmail_service, staff_services = authenticate_all_accounts()
 
         # Define start and end times (you can make this dynamic based on user input)
         start_time = "2025-01-01T10:00:00"
@@ -158,9 +205,12 @@ def scheduling_module(content_frame, feedback_area, services):
         # Attendees: client + secondary + third person
         attendees = [client_email, secondary_person, third_person]
 
-        # Create event
-        event = create_event(service, reason, start_time, end_time, attendees)
+        # Create event using the admin service
+        event = create_event(admin_service, reason, start_time, end_time, attendees)
 
+        # Send confirmation email to client only
+        send_email(admin_gmail_service, client_email, "Confirmation: Your Meeting Scheduled", "Your meeting has been confirmed.")
+        
         log_to_feedback(feedback_area, f"Event created: {event.get('htmlLink')}")
 
     # Schedule Task Button
