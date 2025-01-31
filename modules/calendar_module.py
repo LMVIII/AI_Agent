@@ -1,80 +1,74 @@
-Creating a Python module that interacts with the Google Calendar API to schedule events involves several steps. Here's a guide, but note that this gets in-depth and advanced very quickly. 
+First of all, I will assume that you've created a project in the Google API Console, enabled the Google Calendar API, and obtained OAuth 2.0 client ID credentials. 
 
-This program assumes you have Python properly installed on your device, and then you should install the required Python libraries using pip.
+I'll write a Python script using the Google Client Library, which allows interaction with Google APIs. 
 
-```bash
-pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
-```
+This script will authenticate a session via OAuth 2.0 and will contain a function to create a new event in your calendar. Note that you'll need to replace 'your_client_id.json' in line 7 with your downloaded OAuth 2.0 client ID .json file. 
 
-Following is a skeleton of a Python module named `gcal_scheduler.py` using OAuth2:
+Here's your Python script:
 
 ```python
-import os
-from google.oauth2.credentials import Credentials
+from __future__ import print_function
+import datetime
+import pickle
+import os.path
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
-import datetime
+import googleapiclient.discovery
 
-# If modifying these SCOPES, delete the file token.json.
+# If modifying these SCOPES, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-def google_calendar_service():
+def authenticate_google_account():
+    """Shows basic usage of the Google Calendar API
+    Lists the next 10 events on the user's calendar.
+    """
     creds = None
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json')
+    # The file token.pickle stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time.
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
+                'your_client_id.json', SCOPES)
             creds = flow.run_local_server(port=0)
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
-    return build('calendar', 'v3', credentials=creds)
+        # Save the credentials for the next run
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
 
+    service = googleapiclient.discovery.build('calendar', 'v3', credentials=creds)
+    return service
 
-def create_event(service, calendar_id: str, start_time_str: str, end_time_str: str, 
-                 summary: str, description: str, location: str):
-    start = datetime.datetime.strptime(start_time_str, "%Y-%m-%dT%H:%M:%S")
-    end = datetime.datetime.strptime(end_time_str, "%Y-%m-%dT%H:%M:%S")
+def create_event(service, start_time_str, end_time_str, summary, description, location):
+    event = {
+      'summary': summary,
+      'location': location,
+      'description': description,
+      'start': {
+        'dateTime': start_time_str,
+        'timeZone': 'America/Los_Angeles',
+      },
+      'end': {
+        'dateTime': end_time_str,
+        'timeZone': 'America/Los_Angeles',
+      },
+      'reminders': {
+        'useDefault': False,
+        'overrides': [
+          {'method': 'email', 'minutes': 24 * 60},
+          {'method': 'popup', 'minutes': 10},
+        ],
+      },
+    }
 
-    event_result = service.events().insert(calendarId=calendar_id, 
-                                           body={
-                                               "summary": summary,
-                                               "description": description,
-                                               "start": {"dateTime": start.isoformat()},
-                                               "end": {"dateTime": end.isoformat()},
-                                               "location": location,
-                                           }
-                                           ).execute()
+    event = service.events().insert(calendarId='primary', body=event).execute()
+    print(f'Event created: {event.get("htmlLink")}')
+``` 
 
-    return event_result['id']
+This is just a simple script. You'll need to call `authenticate_google_account` to authenticate your session. Then, you can use the returned `service` object with the `create_event` function to create a new event on your Google Calendar.
 
-
-if __name__ == "__main__":
-    # Call this function to get the google calendar service object 
-    service = google_calendar_service() 
-
-    # event details
-    start = "2019-07-25T00:00:00"
-    end = "2019-07-26T00:00:00"
-    summary = "Meeting with Bob"
-    description = "Discuss the new project"
-    location = "Conference Room A"
-
-    calendar_id = 'primary' # add your calendar id here
-
-    create_event(service, calendar_id, start, end, summary, description, location)
-```
-
-This code first tries to authenticate using the saved `token.json` file. If it's not present or is invalid, it falls back to using `credentials.json` and saves a new `token.json` file.
-
-`create_event` function accepts event details and makes a request to Google Calendar API to create an event.
-
-The `credentials.json` file contains your OAuth2 client ID and secret. You can get it from https://console.cloud.google.com/apis/credentials after creating a project and enabling the Google Calendar API.
-
-The code above uses the 'primary' calendar. If you want to use a different calendar, replace 'primary' with your calendar ID.
-
-This is a very basic script, and for production use you should add more error checking/handling, etc.
+Please note that the date-time strings accepted by `create_event` should be in the following format: 'yyyy-mm-ddThh:mm:ss'. The 'T' and colons are optional.

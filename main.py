@@ -28,7 +28,8 @@ def main():
     finally:
         # Ensure the program exits once the GUI is closed
         print("GUI has been closed.")
-        exit()  # Exit immediately after closing the GUI
+        exit()  # Exit immediately after closing the GUI to prevent reopening
 
 if __name__ == "__main__":
     main()
+
